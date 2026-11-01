@@ -74,6 +74,8 @@ export default class Pins extends View {
     if (c === "unpin") {
       const m = matchPin(pinList(), s);
       if (m) unpin(m);
+    } else if (c === "pick") {
+      this.openPicker(s);
     } else if (c === "pin") {
       const t = focused()?.terminal;
       if (!t || !s) return;

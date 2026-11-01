@@ -58,6 +58,7 @@ your layout's name:
   "layout:my-layout": {
     "cmd-alt-p": "pins.pin",
     "cmd-alt-u": "pins.unpin",
+    "cmd-alt-o": "pins.pick",
     "cmd-alt-j": "layout.toggle:pins"
   }
 }
@@ -65,6 +66,7 @@ your layout's name:
 
 - `pins.pin` pins the focused terminal to this space.
 - `pins.unpin` removes the pin shown for this space.
+- `pins.pick` opens the Pin… list for this space.
 - `layout.toggle:pins` hides or shows the whole column. It is Herdr's own command,
   not the mod's, because a hidden mod gets no key commands and could not show
   the column again.
