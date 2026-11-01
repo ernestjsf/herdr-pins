@@ -33,13 +33,14 @@ it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
     side padding, 4px gap, radius 5, 12px icon and 11px label in `muted`;
     `hover` behind and `foreground` under the pointer.
 - **The terminal**, a layout block `{ "terminal": "<address>" }`, the rest of the
-  column. With nothing (live) pinned the column is 28px and the block 0px, with
-  no terminal in it (address `""`): only the header shows. It is never hidden.
-- **In a row** (moved right or left) the folded column is a 28px-wide strip: the
+  column. With nothing (live) pinned the column is 29px and the block 1px, with
+  no terminal in it (address `""`): only the header shows. It is never hidden and
+  never 0px (see Watch out).
+- **In a row** (moved right or left) the folded column is a 29px-wide strip: the
   header is then only the pin icon, centered, and a click on it opens Pin…. Below
-  it the strip is empty (the block is 0px).
-- An empty address draws Herdr's placeholder card in the block: at 0px it does not
-  show, which is why the block is resized to 0px and not only the column.
+  it the strip is empty (the block is 1px).
+- An empty address draws Herdr's placeholder card in the block: at 1px it does not
+  show, which is why the block is resized to 1px and not only the column.
 
 **The Move… popup** is 160 × 130 at the pointer, on `popover`, 5px padding,
 12.8px type: four 30px rows, **Bottom**, **Top**, **Right**, **Left**, each a 13px
@@ -109,8 +110,9 @@ the header works out what the block should show: the match's address if that
 terminal is in `terminals()` with `state` `live`, else nothing. Only when that
 differs from what it last asked for:
 
-- nothing: `layout.resize` the column to 28px and the block to 0px, then write
-  `""` as the block's address (as below), so no live terminal is squeezed to 0px;
+- nothing: `layout.resize` the column to 29px (the header and 1px) and the block to
+  1px, then write `""` as the block's address (as below), so no live terminal is
+  squeezed to 1px;
 - an address: read the shown layout's file (`<appHome>/layouts/<shared("layout")>.json`),
   replace the `"terminal": "…"` value inside the object whose `"id"` is the block's
   id (whatever the key order; strings with braces or escaped quotes don't
@@ -278,15 +280,14 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
 - Icons don't paint when `mods/pins` is a symlink to a folder outside
   `~/.config/herdr-app`; a real copy paints them. Hence setup copies. Through a
   symlink the folded strip on the right or left would look empty.
-- Herdr's own save of a layout file drops every node hidden by a click and then
-  unwraps each container left with one child. Seen once on `my-main`: the hidden
-  `pins-terminal` was dropped, `pins` unwrapped into `pins-header`, and the
-  shipped `panel` column (one child) unwrapped too. Hence the fold never hides
-  anything. The `panel` unwrap comes from Herdr's own layout and the mod can't
-  prevent it. The README tells people not to bind `layout.toggle:pins` for the
-  same reason.
-  Recovery: `setup.mjs` keeps the layout as it was before the column as
-  `<name>.json.before-pins`; copy it back and run setup again.
+- Herdr's own save of a layout file drops every node that is hidden by a click
+  **or sized 0px**, and then unwraps each container left with one child. Seen twice
+  on `my-main`: once with the block hidden, once (00:23 on 2 Nov) with it folded to
+  0px. Each time `pins-terminal` was dropped, `pins` unwrapped into `pins-header`
+  (loose in `main-row`), and the shipped `panel` column (one child) unwrapped too.
+  Hence the fold never hides anything and never goes below 1px. The `panel` unwrap
+  comes from Herdr's own layout and the mod can't prevent it. The README tells
+  people not to bind `layout.toggle:pins` for the same reason.
 - Never `layout.set`. In Herdr 0.1.11 it drops nodes from the tree and then
   keeps rewriting the layout file from its memory copy until the window
   restarts. Editing the file is the supported path.
@@ -297,7 +298,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   hidden, nothing swaps until it draws again (timers and `nextCommand` still run).
 - `hc run --name` must be unique among live terminals: hence the time suffix.
 - `layout.resize` is a click, kept in `layouts/.state/`, not in the file. The
-  column's `min` must allow 28px or the fold stops at the minimum.
+  column's `min` must allow 29px or the fold stops at the minimum.
 - `SpaceInfo.folder` is where a space's new terminals start, which may not be
   where its shell is now; the match's fallback compares that field, and the
   Start rows use the live folder.
@@ -341,6 +342,6 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   is absent.
 - `pins.move:right` puts the column beside the tab area; `pins.move:bottom` puts it
   back, and the layout file is as before (key order of the wrapper aside). Folded
-  on the right it is a 28px strip with the pin icon.
+  on the right it is a 29px strip with the pin icon.
 - `node setup.mjs --layout terminals --place right` on a fresh clone puts the
   column right of the tab area.

@@ -16,7 +16,7 @@ tabs always shows git for the repo you are in.
 - Hover the header for **Pin…**, **Move…** and **Unpin**, or press your Pin… key. Pin… opens a list in two parts. **Start new**: **Start lazygit here**, **Start a shell here**, your own [starters](#starters), and **Add a command…**. **Pin an open terminal**: **Pin this pane** (the terminal you were in), then the other terminals in this space's tabs, each with its tab's name and address (`2 · Claude Code … t65`). Each row has three buttons: **Space**, **Machine**, **All**.
 - The list works from the keyboard: ↑/↓ choose, Enter pins to this space, **m** to this machine, **a** everywhere, **u** unpins, **g** goes to the pinned terminal, **b t r l** move the column, **n** adds a command, **x** removes a starter, Esc closes. The footer lists them.
 - Pinning a terminal moves it: its pane leaves the tab and the terminal shows in the pins column only. Its tab closes if the pane was alone; the space keeps a new shell tab if that was its last tab. Unpin gives it a new tab in the current space.
-- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the folded column is a 28px strip with the pin icon; click it for Pin….
+- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the folded column is a 29px strip with the pin icon; click it for Pin….
 - Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only choosing a Start row or clicking Restart starts a program.
 - Pinning again to the same space (or machine, or everywhere) replaces the earlier pin there.
 - A pinned terminal that has ended shows as `t7 has ended` with Unpin. Pins are never deleted on their own.
@@ -62,7 +62,7 @@ wrap the `main` block in a column and add the pins column after it:
 ] }
 ```
 
-Keep `"min": 28`: the mod folds the column to its 28px header. The header's props
+Keep `"min": 28`: the mod folds the column to its 28px header and a 1px block (29px). The header's props
 name the terminal block it drives (`block`, default `pins-terminal`) and the column
 it folds (`column`, default `pins`).
 
@@ -92,7 +92,7 @@ The other commands are there for anyone who wants direct keys; bind any of them 
 
 Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
 drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
-folds to its 28 px header on its own.
+folds to its header on its own.
 
 ## Starters
 
@@ -124,9 +124,10 @@ file: when the space changes it reads the file, replaces the one `"terminal": "�
 value inside the `pins-terminal` block and writes it back only if the address changed
 (the write is refused if the file changed in between; it reads again and retries once).
 Nothing else in the file changes. The window picks the edit up within a second.
-Folding resizes the column to 28px and the terminal block to 0px and sets its address
-to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is hidden: when
-Herdr saves a layout itself it drops hidden nodes (see RECIPE.md, Watch out).
+Folding resizes the terminal block to 1px (the column to its header and that 1px) and
+sets its address to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is
+hidden and nothing is 0px: when Herdr saves a layout itself it drops hidden and 0px
+nodes (see RECIPE.md, Watch out).
 
 Moving the column is a structural edit: the mod rewrites the whole layout file as
 2-space JSON with the column (and its `main-column` or `main-row` wrapper) moved,

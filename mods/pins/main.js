@@ -220,18 +220,18 @@ export default class Pins extends View {
   }
 
   // Show `want` in the block, or fold the column to its header (null). Runs when the match changes.
-  // The fold is resizes alone: Herdr's own layout save drops nodes hidden by a click and unwraps
-  // what is left, so the block is never hidden. Folded, the column is 28px and the block 0px
-  // (in a row the column is a strip and the block would fill it), with no terminal in it: its
-  // address is "", so no live terminal is squeezed to nothing.
+  // The fold is resizes alone: Herdr's own layout save drops a node that is hidden or 0px and
+  // unwraps what is left, so the block is never hidden and never 0px. Folded, the block is 1px
+  // and the column its header plus that 1px (in a row the column is a strip and the block would
+  // fill it), with no terminal in the block: its address is "", so no live terminal is squeezed.
   sync(cx, want) {
     if (want === this.want) return;
     this.want = want;
     // An older version hid the block: show it once, or it stays hidden.
     if (findNode(layout(), this.block)?.hidden) run("layout.show", { id: this.block });
     if (!want) {
-      run("layout.resize", { id: this.column, px: HEADER });
-      run("layout.resize", { id: this.block, px: 0 });
+      run("layout.resize", { id: this.column, px: HEADER + 1 });
+      run("layout.resize", { id: this.block, px: 1 });
     }
     cx.spawn(async () => {
       const path = layoutFile();
