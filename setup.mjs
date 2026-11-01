@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-step setup: node setup.mjs [--layout <name>] [--height <px>] [--dry-run]
+// One-step setup: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--dry-run]
 import { execFileSync } from "node:child_process";
 import { copyFileSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -12,13 +12,15 @@ const fail = (s) => { console.error(`setup: ${s}`); process.exit(1); };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const app = (...args) => execFileSync("herdr-app", args, { encoding: "utf8" });
 
-const usage = "usage: node setup.mjs [--layout <name>] [--height <px>] [--dry-run]";
-let asked, height = 360, dry = false;
+const usage = "usage: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--dry-run]";
+const PLACES = ["bottom", "top", "right", "left"];
+let asked, height = 360, place = "bottom", dry = false;
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--dry-run") dry = true;
   else if (argv[i] === "--layout" && argv[i + 1]) asked = argv[++i];
   else if (argv[i] === "--height" && argv[i + 1]) height = Number(argv[++i]);
+  else if (argv[i] === "--place" && PLACES.includes(argv[i + 1])) place = argv[++i];
   else fail(`bad argument ${argv[i]}\n${usage}`);
 }
 if (!Number.isInteger(height) || height < 28 || height > 700) fail("--height must be a whole number from 28 to 700");
@@ -61,10 +63,10 @@ else if (isShipped(picked)) say(`using existing ${name}`);
 const source = existsSync(file(name)) ? file(name) : file(picked);
 const text = readFileSync(source, "utf8");
 const tree = JSON.parse(text);
-const next = insertPinsColumn(tree, { height });
-if (next === tree) { say(`${name}: already set up`); process.exit(0); }
+const next = insertPinsColumn(tree, { height, place });
+if (next === tree) { say(`${name}: already set up (move the column with Move… in its header)`); process.exit(0); }
 if (!next) fail(`${name} has no block with content.tab "active"; add the column by hand (see README)`);
-say(`${note}add the pins column (${height}px) under the tab area of ${name}`);
+say(`${note}add the pins column (${height}px) ${{ bottom: "under", top: "over", right: "right of", left: "left of" }[place]} the tab area of ${name}`);
 if (!dry) {
   try { copyFileSync(file(name), `${file(name)}.before-pins`, constants.COPYFILE_EXCL); say(`backed up to ${name}.json.before-pins`); } catch (e) { if (e.code !== "EEXIST") throw e; }
   writeFileSync(file(name), JSON.stringify(next, null, 2) + "\n");

@@ -28,6 +28,17 @@ export function upsertPin(pins, pin) {
   return at < 0 ? [...list, pin] : list.map((p, i) => (i === at ? pin : p));
 }
 
+// The pin that `pin` would replace: the one for the same scope and target, or null.
+export function replacedPin(pins, pin) {
+  return (pins ?? []).find((p) => target(p) === target(pin)) ?? null;
+}
+
+// A pin taken out of the list (unpinned or replaced) gets its pane back when pinning moved
+// it out of its tab and no pin left in `pins` still shows that terminal.
+export function paneBack(pin, pins) {
+  return Boolean(pin?.moved) && !(pins ?? []).some((p) => p.terminal === pin.terminal);
+}
+
 // Where the block's `"terminal": "<address>"` value sits in the layout text: inside the
 // object that has `"id": "<blockId>"`, whatever the key order. Null when absent.
 function terminalValue(text, blockId) {
@@ -118,18 +129,61 @@ export function pinsColumn(height = 360) {
 
 const hasId = (n, id) => n.id === id || (n.children ?? []).some((c) => hasId(c, id));
 
-// A copy of the layout tree with the tab area (the block showing `tab: "active"`) wrapped in a
-// column with the pins column under it. The same tree when `pins` is already there; null when
-// there is no tab block.
-export function insertPinsColumn(tree, { height = 360 } = {}) {
-  if (hasId(tree, "pins")) return tree;
-  const out = structuredClone(tree);
-  const wrap = (parent) => {
-    const kids = parent.children ?? [];
+// The node whose children hold `id`, or null.
+export function parentOf(node, id) {
+  for (const c of node.children ?? []) {
+    if (c.id === id) return node;
+    const hit = parentOf(c, id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// Where the pins column sits beside the tab block: "bottom", "top", "right", "left", else null.
+export function pinsPlace(tree) {
+  const p = parentOf(tree, "pins");
+  if (p?.children.length !== 2 || !p.children.some((c) => c.content?.tab === "active")) return null;
+  const first = p.children[0].id === "pins";
+  return p.type === "row" ? (first ? "left" : "right") : p.type === "column" ? (first ? "top" : "bottom") : null;
+}
+
+// The wrapper each place puts around the tab block, and whether pins comes first.
+const PLACES = {
+  bottom: ["main-column", "column", false], top: ["main-column", "column", true],
+  right: ["main-row", "row", false], left: ["main-row", "row", true],
+};
+
+// A copy of the layout tree with the pins column moved beside the tab block (the block showing
+// `tab: "active"`): under it, over it, right or left of it, in a `main-column` or `main-row`
+// wrapper (gap 8). The wrapper it leaves is replaced by its one remaining child. The same tree
+// when it is already there; null when there is no pins column, no tab block or no such place.
+export function movePinsColumn(tree, where) {
+  const place = PLACES[where];
+  if (!place) return null;
+  if (pinsPlace(tree) === where) return tree;
+  const out = JSON.parse(JSON.stringify(tree)); // no structuredClone in the mod runtime
+  const parent = parentOf(out, "pins");
+  if (!parent) return null;
+  const pins = parent.children.splice(parent.children.findIndex((c) => c.id === "pins"), 1)[0];
+  if (/^main-(column|row)$/.test(parent.id) && parent.children.length === 1) {
+    const up = parentOf(out, parent.id);
+    if (up) up.children[up.children.indexOf(parent)] = parent.children[0];
+  }
+  const [id, type, first] = place;
+  const wrap = (node) => {
+    const kids = node.children ?? [];
     const at = kids.findIndex((c) => c.content?.tab === "active");
     if (at < 0) return kids.some(wrap);
-    kids[at] = { id: "main-column", type: "column", gap: 8, children: [kids[at], pinsColumn(height)] };
+    kids[at] = { id, type, gap: 8, children: first ? [pins, kids[at]] : [kids[at], pins] };
     return true;
   };
   return wrap(out) ? out : null;
+}
+
+// A copy of the layout tree with the pins column added beside the tab area (`place`, default
+// under it). The same tree when `pins` is already there; null when there is no tab block.
+export function insertPinsColumn(tree, { height = 360, place = "bottom" } = {}) {
+  if (hasId(tree, "pins")) return tree;
+  if (!tree.children) return null;
+  return movePinsColumn({ ...tree, children: [...tree.children, pinsColumn(height)] }, place);
 }

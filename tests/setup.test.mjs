@@ -40,3 +40,82 @@ test("isShipped: Herdr's own layouts only", () => {
   for (const n of ["main", "terminals", "win98"]) assert.equal(P.isShipped(n), true);
   for (const n of ["my-main", "pins-test"]) assert.equal(P.isShipped(n), false);
 });
+
+// The pins column under the tab area of the shipped main, as setup puts it.
+const placed = P.insertPinsColumn(main);
+const ids = (n) => (n.children ?? []).map((c) => c.id);
+// The tree with the pins column and its wrapper gone: what must not change in a move.
+const rest = (tree) => {
+  const t = structuredClone(tree);
+  const strip = (n) => {
+    n.children = n.children?.flatMap((c) => (c.id === "pins" ? [] : /^main-(column|row)$/.test(c.id) ? c.children.filter((k) => k.id !== "pins") : [c]));
+    n.children?.forEach(strip);
+  };
+  strip(t);
+  return t;
+};
+
+test("movePinsColumn: the four places beside the tab block", () => {
+  const cases = { bottom: ["main-column", "column", ["main", "pins"]], top: ["main-column", "column", ["pins", "main"]], right: ["main-row", "row", ["main", "pins"]], left: ["main-row", "row", ["pins", "main"]] };
+  for (const [where, [id, type, order]] of Object.entries(cases)) {
+    const out = P.movePinsColumn(placed, where);
+    const wrap = find(out, id);
+    assert.equal(wrap.type, type, where);
+    assert.equal(wrap.gap, 8, where);
+    assert.deepEqual(ids(wrap), order, where);
+    assert.deepEqual(ids(find(out, "work-body")), [id, "panel"], where);
+    assert.equal(P.pinsPlace(out), where);
+    // The column itself is untouched, size included.
+    assert.deepEqual(find(out, "pins"), find(placed, "pins"));
+    assert.deepEqual(rest(out), rest(placed), where);
+  }
+});
+
+test("movePinsColumn: round trips and the input is untouched", () => {
+  const before = structuredClone(placed);
+  for (const where of ["top", "right", "left"]) {
+    const there = P.movePinsColumn(placed, where);
+    assert.deepEqual(P.movePinsColumn(there, "bottom"), placed, where);
+  }
+  const r = P.movePinsColumn(placed, "right");
+  assert.deepEqual(P.movePinsColumn(r, "left"), P.movePinsColumn(placed, "left"));
+  assert.deepEqual(P.movePinsColumn(P.movePinsColumn(r, "top"), "right"), r);
+  assert.deepEqual(placed, before);
+});
+
+test("movePinsColumn: the same tree when it is already there", () => {
+  assert.equal(P.movePinsColumn(placed, "bottom"), placed);
+  const r = P.movePinsColumn(placed, "right");
+  assert.equal(P.movePinsColumn(r, "right"), r);
+});
+
+test("movePinsColumn: a column placed by hand elsewhere moves beside the tab block", () => {
+  const hand = structuredClone(main);
+  hand.children.push(P.pinsColumn(300));
+  const out = P.movePinsColumn(hand, "right");
+  assert.deepEqual(ids(find(out, "main-row")), ["main", "pins"]);
+  assert.equal(find(out, "pins").size.px, 300);
+  assert.deepEqual(ids(out), ids(main));
+});
+
+test("movePinsColumn: null without a pins column, a tab block or a known place", () => {
+  assert.equal(P.movePinsColumn(main, "right"), null);
+  const bare = { id: "root", type: "column", children: [P.pinsColumn()] };
+  assert.equal(P.movePinsColumn(bare, "right"), null);
+  assert.equal(P.movePinsColumn(placed, "middle"), null);
+});
+
+test("pinsPlace: null when the column is not beside the tab block", () => {
+  assert.equal(P.pinsPlace(main), null);
+  const hand = structuredClone(main);
+  hand.children.push(P.pinsColumn());
+  assert.equal(P.pinsPlace(hand), null);
+});
+
+test("insertPinsColumn: place puts the column right, left, top or bottom", () => {
+  for (const where of ["bottom", "top", "right", "left"]) {
+    const out = P.insertPinsColumn(main, { place: where });
+    assert.equal(P.pinsPlace(out), where);
+    assert.deepEqual(out, P.movePinsColumn(placed, where));
+  }
+});

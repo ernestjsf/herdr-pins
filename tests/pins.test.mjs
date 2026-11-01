@@ -66,6 +66,27 @@ test("upsertPin: one pin per scope and target", () => {
   assert.deepEqual(P.upsertPin(null, a), [a]);
 });
 
+test("replacedPin: the pin at the same scope and target, else null", () => {
+  const s1 = pin("space", "t3", { space: "sp1" });
+  const a = pin("all", "t1");
+  assert.equal(P.replacedPin([s1, a], pin("space", "t9", { space: "sp1" })), s1);
+  assert.equal(P.replacedPin([s1, a], pin("all", "t9")), a);
+  assert.equal(P.replacedPin([s1, a], pin("space", "t9", { space: "sp2" })), null);
+  assert.equal(P.replacedPin(null, a), null);
+});
+
+test("paneBack: only a moved pin, and only when no pin left shows its terminal", () => {
+  const moved = pin("space", "t3", { space: "sp1", moved: true });
+  const other = pin("all", "t1");
+  assert.equal(P.paneBack(moved, [other]), true);
+  assert.equal(P.paneBack(moved, []), true);
+  assert.equal(P.paneBack(moved, null), true);
+  // Pinned again (or still pinned elsewhere): it stays in the pins block.
+  assert.equal(P.paneBack(moved, [pin("machine", "t3")]), false);
+  assert.equal(P.paneBack(pin("space", "t3", { space: "sp1" }), []), false);
+  assert.equal(P.paneBack(null, []), false);
+});
+
 test("replaceBlockTerminal: swaps only that block's address in a real layout", () => {
   assert.equal(P.blockTerminal(layout, "pins-terminal"), "");
   const out = P.replaceBlockTerminal(layout, "pins-terminal", "t66");
