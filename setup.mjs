@@ -1,26 +1,27 @@
 #!/usr/bin/env node
-// One-step setup: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--dry-run]
+// One-step setup: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--key <chord>] [--dry-run]
 import { execFileSync } from "node:child_process";
 import { copyFileSync, constants, cpSync, existsSync, lstatSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { insertPinsColumn, isShipped } from "./mods/pins/pins.js";
+import { addKey, insertPinsColumn, isShipped } from "./mods/pins/pins.js";
 
 const say = (s) => console.log(s);
 const fail = (s) => { console.error(`setup: ${s}`); process.exit(1); };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const app = (...args) => execFileSync("herdr-app", args, { encoding: "utf8" });
 
-const usage = "usage: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--dry-run]";
+const usage = "usage: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--key <chord>] [--dry-run]";
 const PLACES = ["bottom", "top", "right", "left"];
-let asked, height = 360, place = "bottom", dry = false;
+let asked, key, height = 360, place = "bottom", dry = false;
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--dry-run") dry = true;
   else if (argv[i] === "--layout" && argv[i + 1]) asked = argv[++i];
   else if (argv[i] === "--height" && argv[i + 1]) height = Number(argv[++i]);
   else if (argv[i] === "--place" && PLACES.includes(argv[i + 1])) place = argv[++i];
+  else if (argv[i] === "--key" && argv[i + 1]) key = argv[++i];
   else fail(`bad argument ${argv[i]}\n${usage}`);
 }
 if (!Number.isInteger(height) || height < 28 || height > 700) fail("--height must be a whole number from 28 to 700");
@@ -69,7 +70,7 @@ const source = existsSync(file(name)) ? file(name) : file(picked);
 const text = readFileSync(source, "utf8");
 const tree = JSON.parse(text);
 const next = insertPinsColumn(tree, { height, place });
-if (next === tree) { say(`${name}: already set up (move the column with Move… in its header)`); process.exit(0); }
+if (next === tree) { say(`${name}: already set up (move the column with Move… in its header)`); await keys(); process.exit(0); }
 if (!next) fail(`${name} has no block with content.tab "active"; add the column by hand (see README)`);
 say(`${note}add the pins column (${height}px) ${{ bottom: "under", top: "over", right: "right of", left: "left of" }[place]} the tab area of ${name}`);
 if (!dry) {
@@ -85,4 +86,29 @@ else if (now === undefined) say("could not read the window's layout; switch with
 else {
   say(`${note}switch the window from ${now} to ${name}`);
   if (!dry) app("do", "layout.switch", JSON.stringify({ name }));
+}
+
+await keys();
+
+// 6. the one key, only when asked: `--key <chord>` binds it to pins.pick for this layout, unless the
+// chord is bound anywhere in keys.json. Nothing else in the file changes.
+async function keys() {
+  if (!key) return say("no keys changed; to open Pin… with a key: node setup.mjs --key cmd-alt-o");
+  const path = join(home, "keys.json"), error = join(home, "keys.error");
+  if (existsSync(error)) fail(`Herdr rejects ${path} already (see ${error}); fix it first`);
+  let text = "{}";
+  try { text = readFileSync(path, "utf8"); } catch (e) { if (e.code !== "ENOENT") throw e; }
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { fail(`${path} is not valid JSON; add "${key}": "pins.pick" by hand`); }
+  const section = `layout:${name}`;
+  const next = addKey(parsed, section, key, "pins.pick");
+  if (!next) return say(`${key} is already bound in keys.json; no keys changed`);
+  say(`${note}bind ${key} to pins.pick under "${section}" in keys.json`);
+  if (dry) return;
+  writeFileSync(path, JSON.stringify(next, null, 2) + "\n");
+  await wait(1500); // Herdr reads it at once and writes keys.error when it rejects it
+  if (existsSync(error)) {
+    writeFileSync(path, text);
+    fail(`Herdr rejected the key (${readFileSync(error, "utf8").trim()}); keys.json is back as it was`);
+  }
 }
