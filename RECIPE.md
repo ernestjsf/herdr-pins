@@ -1,0 +1,188 @@
+# Pins
+
+A pinned terminal pane for a personal Herdr layout. A pin ties a terminal to
+one space, one machine or everywhere; the pane shows the terminal pinned for the
+current space and follows as spaces change. The everyday use is lazygit pinned
+to each repo's space. The mod is the pane's 28px header; the terminal is a plain
+layout block whose address the mod rewrites in the layout file.
+
+
+## What you see
+
+A column in the layout (the README puts it under the tabs: the `main` block and
+it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
+`accent` border while the focus is inside. Top to bottom:
+
+- **Header**, 28px, the mod. One row, 10px side padding, 8px gaps, 12px type, on
+  `background`:
+  - a 13px pin icon, `accent` when something is pinned here, else `dim`;
+  - nothing pinned: `Nothing pinned here` in `dim`, truncated;
+  - pinned: the program's icon at 14px (the app's program table: `svg` tinted
+    `dim` when `tint`, else `image`), its name (`terminals()`' `program.name`, else
+    the pin's `name`) medium weight in `foreground`, at most 220px, truncated;
+    the terminal's live folder (`foreground.cwd`, else `cwd`; `~` for home,
+    `~/…` under it) in `dim`, filling the row, truncated; the scope tag: 18px
+    tall, 6px side padding, radius 5, `accent` at 12% (`accent` + `1f`) behind
+    10.5px medium `accent` text, `this space`, `this machine` or `everywhere`;
+  - a pinned terminal that is no longer live: the name in `dim` and `t7 has
+    ended` where the folder goes;
+  - a kept program that came back as something else (see Restart): a Restart
+    button (refresh icon);
+  - under the pointer only, at the right: **Pin…** (pin icon), and **Unpin**
+    (pin-off icon) when something is pinned. Header buttons are 20px tall, 6px
+    side padding, 4px gap, radius 5, 12px icon and 11px label in `muted`;
+    `hover` behind and `foreground` under the pointer.
+- **The terminal**, a layout block `{ "terminal": "<address>" }`, the rest of the
+  column. With nothing (live) pinned it is hidden and the column is 28px: only
+  the header shows.
+
+**The picker** is a 440px popup at the pointer, its height 48 + 30 per row
+(at most 440), on `popover`, 5px padding, 12.8px type:
+
+- A 28px title line, 8px left padding, 11px `dim`: `Pin in <space name>: for this
+  space, this machine, or all` (`Starting…` while a Start runs), and a close
+  button (x icon, 12px, radius 4, `hover` under the pointer).
+- Rows, 30px, 8px side padding, 8px gaps, radius 7, `hover` under the pointer,
+  scrolling past the popup's height:
+  - **Start lazygit here** and **Start a shell here**, each with a 13px play icon
+    in `muted`, then the space's current folder at 11px `dim`;
+  - then one row per terminal pane in the space's tabs (`panes()` with a
+    `terminal`, in that order): its program icon at 14px (an empty 14px slot
+    when none), its name as the pane header names it (an agent's or shell's
+    program name, else the title, else the program's name, else `shell`), at
+    most 150px, in `foreground`, and its live folder at 11px `dim`.
+  - At the right of every row three buttons: **Space**, **Machine**, **All**:
+    20px tall, 6px side padding, radius 5, 1px `border`, 11px `muted`;
+    `selected` behind and `foreground` text under the pointer.
+
+
+## How it behaves
+
+**Pins** are kept in `shared("pins.list")`, an array of `{ terminal, scope:
+"space" | "machine" | "all", space, machine, folder, argv, name }`. `terminal` is
+the address (`t7`, or `machine/t7` for another machine). `space` is the space's
+id, `machine` its machine (null for this computer), `folder` its `SpaceInfo.folder`
+(the folder Herdr gives it, not where its shell is now), recorded for every scope.
+`argv` is the program a Start ran (`["lazygit"]`), null for a shell or a picked
+terminal; `name` a label (`argv[0]`, else the row's name).
+
+**The match** for a space: a space pin whose `space` is the space's id, or (the
+id gone, as after a core restart might do) whose `machine` and `folder` equal the
+space's; else a machine pin whose `machine` equals the space's machine (null is
+this computer); else an everywhere pin. The first in list order wins within a
+kind. The current space is `spaces()`' entry for `focused().space` (the active
+space if that is missing).
+
+**One pin per scope and target**: pinning to a space that has a space pin
+replaces it in place (the same for a machine, and for everywhere); otherwise the
+pin is appended.
+
+**Showing it**, on every render (Herdr re-renders on space and focus changes),
+the header works out what the block should show: the match's address if that
+terminal is in `terminals()` with `state` `live`, else nothing. Only when that
+differs from what it last asked for:
+
+- nothing: `layout.hide` the block and `layout.resize` the column to 28px;
+- an address: read the shown layout's file (`<appHome>/layouts/<shared("layout")>.json`),
+  replace the `"terminal": "…"` value inside the object whose `"id"` is the block's
+  id (whatever the key order; strings with braces or escaped quotes don't
+  confuse it), and write it back with `writeTextFile(path, next, text)` only if
+  it changed. A refused write (the file changed in between) reads again and
+  retries once. Then `layout.show` the block and resize the column to its open
+  height. If the wanted address changed meanwhile, the older task stops before
+  writing or showing.
+- The open height is `shared("pins.height")`, set once from the column's
+  `size.px` in the layout file (240 if missing or not above 28).
+
+Nothing else in the file is touched: no reformatting, no reordering. The window
+reloads the edited layout by itself; the header's copy lives on, since its block
+is unchanged.
+
+**The header**: a click on the row focuses the terminal block
+(`pane.focus {terminal}`) when the pinned terminal is live. Pin… opens the
+picker for the current space (`openOverlay({ mod: "pins", kind: "popup",
+props: { picker: true, space } })`); Unpin removes the matched pin (by value)
+from the list. Neither ends any terminal.
+
+**Restart**: after a core restart a kept terminal comes back as a shell. When the
+pin has an `argv` and the live terminal's `foreground.argv[0]` (else `argv[0]`)
+differs from it by file name (`/opt/homebrew/bin/lazygit` matches `lazygit`), the
+header offers Restart, which runs `hc send <terminal> <argv joined by spaces>`.
+
+**The picker**: a scope button pins its row. A Start row first starts the
+program in the space's current folder (its first tab pane's live folder, else
+`SpaceInfo.folder`): `hc run --bg --keep --no-parent --outlive-parent --no-notify
+--name <name> --cwd <folder> [--on <machine>] --json [-- <argv…>]`, no argv for the
+shell (hc then starts that machine's shell). The name is `pin-<program>-<folder's
+last part>-<4 characters of the time in base 36>`, lowercased, other characters
+as `-`, at most 32. The printed `address` is bare even with `--on`: prefix
+`<machine>/` for a remote space. A failed start toasts `Couldn't start it` with
+hc's error and pins nothing. The popup closes after a pick.
+
+**Keys**, through `nextCommand()` in the header copy (not the picker's):
+`pin` pins `focused().terminal` to the current space (scope space, no argv, its
+program's name as the label); `unpin` removes the current match. Hiding and
+showing the column is Herdr's `layout.toggle:pins`, bound in keys.json.
+
+Programs only start from a Start or Restart click.
+
+
+## Built from
+
+- `mods/pins/`, `mod.json` `{ "place": "none", "title": "Pins" }`: it docks
+  nowhere by itself; a layout block puts it in.
+- `main.js`: one `View` with two roles: the header (props `{ block =
+  "pins-terminal", column = "pins" }`) and the picker (`props().picker`, with
+  `space`). Helpers copied from Herdr's mods: `place(s)` from `menu`, the folder
+  and program-icon helpers from `pane`.
+- `pins.js`, no herdr import: `matchPin(pins, space)`, `upsertPin(pins, pin)`,
+  `blockTerminal(text, blockId)`, `replaceBlockTerminal(text, blockId, address)`
+  (one pass over the text tracking strings and the open objects; the same text
+  when the block is missing or already shows the address), `startArgs({ folder,
+  machine, argv, name })`, `terminalName(what, folder, suffix)`,
+  `needsRestart(pin, term)`.
+- `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, with
+  `LICENSE-lucide.txt`.
+- `tests/pins.test.mjs` (node:test) and `tests/fixtures/layout.json`, a clone of
+  Herdr's `main` with the pins column.
+
+
+## Watch out
+
+- Never `layout.set`. In Herdr 0.1.11 it drops nodes from the tree and then
+  keeps rewriting the layout file from its memory copy until the window
+  restarts. Editing the file is the supported path.
+- `<mod>.<command>` reaches shown copies only. A hidden column's header gets no
+  key commands, so a `pins.toggle` could hide the column but never show it
+  again: use `layout.toggle:pins`.
+- A copy that isn't drawn doesn't render: with the screen locked or the window
+  hidden, nothing swaps until it draws again (timers and `nextCommand` still run).
+- `hc run --name` must be unique among live terminals: hence the time suffix.
+- `layout.hide` / `show` / `resize` are clicks, kept in `layouts/.state/`, not in
+  the file. The column's `min` must allow 28px or the fold stops at the minimum.
+- `SpaceInfo.folder` is where a space's new terminals start, which may not be
+  where its shell is now; the match's fallback compares that field, and the
+  Start rows use the live folder.
+- A popup's tasks end when it closes: the picker awaits the start and the pin
+  before closing itself.
+
+
+## Done when
+
+- `node --test tests/` passes: the match's priorities and list order, the
+  folder fallback (and not on another machine), machine null vs a name, one pin
+  per scope and target, the address swap in the fixture (only that line;
+  identical text when equal or missing; a mod block has none), several terminal
+  blocks with the id after the content, braces and escaped quotes in strings,
+  `hc run` arguments here, `--on` and for a shell, terminal names, and Restart.
+- `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
+  shows `"errors": []` on the layout with the column.
+- In a space with no pin the column is its header, `Nothing pinned here`.
+- Pin… → Start lazygit here → Space: `hc ls` shows a live `pin-lazygit-…`
+  terminal in that folder, the layout file differs from before in that one
+  `terminal` value, and the pane shows lazygit under a header naming it with
+  `this space`. Another space folds the column; back, lazygit again.
+- A terminal pinned with All shows in every space without its own pin; a space
+  pin still wins in its space.
+- `herdr-app do pins.pin` pins the focused terminal to this space;
+  `pins.unpin` brings back what showed before.
