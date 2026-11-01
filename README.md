@@ -13,7 +13,9 @@ tabs always shows git for the repo you are in.
 - A column under your tabs (or anywhere in your layout) with a 28px header and a terminal.
 - The header shows the pinned terminal's program, its folder, and where it is pinned: `this space`, `this machine` or `everywhere`. Click it to focus the terminal.
 - A space pin beats a machine pin, which beats an everywhere pin. With nothing pinned the column folds to its header, which says `Nothing pinned here`.
-- Hover the header for **Pin…** and **Unpin**. Pin… opens a list: **Start lazygit here**, **Start a shell here**, then the terminals in this space's tabs. Each row has three buttons: **Space**, **Machine**, **All**.
+- Hover the header for **Pin…**, **Move…** and **Unpin**. Pin… opens a list: **Start lazygit here**, **Start a shell here**, then the terminals in this space's tabs. Each row has three buttons: **Space**, **Machine**, **All**.
+- Pinning a terminal from a tab that has other panes moves it: its pane leaves the tab and the terminal shows in the pins column only. Unpin gives it a new tab in the current space. A terminal that is its tab's only pane stays where it is (moving it would close the tab).
+- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the folded column is a 28px strip with the pin icon; click it for Pin….
 - Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only a Start or Restart click starts a program.
 - Pinning again to the same space (or machine, or everywhere) replaces the earlier pin there.
 - A pinned terminal that has ended shows as `t7 has ended` with Unpin. Pins are never deleted on their own.
@@ -31,7 +33,8 @@ node setup.mjs
 you are on into `my-<name>` if it is one of Herdr's own, puts the pins column under
 the tab area of that personal layout (the original is saved as
 `<name>.json.before-pins`), and switches the window to it. Run it again and it says
-`already set up`. Options: `--layout <name>`, `--height <px>` (default 360),
+`already set up`. Options: `--layout <name>`, `--height <px>` (default 360; the width
+on the right or left), `--place bottom|top|right|left` (default bottom),
 `--dry-run` (print the plan, write nothing).
 
 ## By hand, or somewhere else
@@ -71,6 +74,7 @@ your layout's name:
     "cmd-alt-p": "pins.pin",
     "cmd-alt-u": "pins.unpin",
     "cmd-alt-o": "pins.pick",
+    "cmd-alt-l": "pins.move:right",
     "cmd-alt-j": "layout.toggle:pins"
   }
 }
@@ -79,6 +83,7 @@ your layout's name:
 - `pins.pin` pins the focused terminal to this space.
 - `pins.unpin` removes the pin shown for this space.
 - `pins.pick` opens the Pin… list for this space.
+- `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there.
 - `layout.toggle:pins` hides or shows the whole column. It is Herdr's own command,
   not the mod's, because a hidden mod gets no key commands and could not show
   the column again.
@@ -103,6 +108,13 @@ Nothing else in the file changes. The window picks the edit up within a second.
 Folding uses `layout.hide` on the terminal block and `layout.resize` on the column,
 which Herdr keeps as clicks, not in your file.
 
+Moving the column is a structural edit: the mod rewrites the whole layout file as
+2-space JSON with the column (and its `main-column` or `main-row` wrapper) moved,
+so a hand-formatted layout loses its formatting. The fold and sizes follow the ids.
+
+Moving a pane into the column is Herdr's `terminal.park` (the pane goes, the
+terminal keeps running) then `hc keep` again, since park turns core keep off.
+
 Pins live in Herdr's shared state under `pins.list`. The column opens at the
 `size.px` in your layout file: raise it there. lazygit wants about 360 px.
 
@@ -118,6 +130,9 @@ Pins live in Herdr's shared state under `pins.list`. The column opens at the
   like local ones.
 - Dragging the column's height is not remembered across a fold: it opens again
   at the `size.px` from your layout file.
+- Move… only places the column beside the tab area. Anywhere else: edit the file.
+- Folded on the right or left with nothing pinned, the strip offers Pin… only; pin
+  something (or use `pins.move:<where>`) to reach Move….
 - Built on Herdr 0.1.11, macOS.
 
 ## Development
@@ -128,7 +143,8 @@ node --test tests/
 
 Stdlib only. `tests/fixtures/layout.json` is a personal layout (a `main` clone)
 with the pins column added. Symlinking `mods/pins` into Herdr does not hot-reload
-on edits; remove and recreate the link to reload.
+on edits; remove and recreate the link to reload. Through the symlink Herdr
+draws none of the mod's icons (a copied folder does).
 
 ## License
 

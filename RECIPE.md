@@ -28,13 +28,20 @@ it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
     ended` where the folder goes;
   - a kept program that came back as something else (see Restart): a Restart
     button (refresh icon);
-  - under the pointer only, at the right: **Pin…** (pin icon), and **Unpin**
-    (pin-off icon) when something is pinned. Header buttons are 20px tall, 6px
+  - under the pointer only, at the right: **Pin…** (pin icon), **Move…** (move
+    icon), and **Unpin** (pin-off icon) when something is pinned. Header buttons are 20px tall, 6px
     side padding, 4px gap, radius 5, 12px icon and 11px label in `muted`;
     `hover` behind and `foreground` under the pointer.
 - **The terminal**, a layout block `{ "terminal": "<address>" }`, the rest of the
   column. With nothing (live) pinned it is hidden and the column is 28px: only
   the header shows.
+- **In a row** (moved right or left) the folded column is a 28px-wide strip: the
+  header is then only the pin icon, centered, and a click on it opens Pin….
+
+**The Move… popup** is 160 × 130 at the pointer, on `popover`, 5px padding,
+12.8px type: four 30px rows, **Bottom**, **Top**, **Right**, **Left**, each a 13px
+Lucide panel icon in `muted` and the label in `foreground`, radius 7, `hover` under
+the pointer. Esc closes it.
 
 **The picker** is a 440px popup at the pointer, its height 48 + 30 per row
 (at most 440), on `popover`, 5px padding, 12.8px type:
@@ -103,6 +110,32 @@ picker for the current space (`openOverlay({ mod: "pins", kind: "popup",
 props: { picker: true, space } })`); Unpin removes the matched pin (by value)
 from the list. Neither ends any terminal.
 
+**Moving a pane in**: storing a pin (a picker row for a terminal, or the `pin` key)
+first looks for the terminal's pane. When its tab has other panes, the pin is stored
+with `moved: true` and the pane goes: `run("terminal.park", {terminal})`, then the
+mod polls `hc get` (300 ms, at most 3 s) until `keep` is false (park applied) and
+runs `hc keep <address>` (a `machine/t9` address works as is). A tab's only pane is
+not parked: park closes the tab, and the last tab closes the space. A pin for a
+terminal that another pin already moved is `moved` too. When a pin goes (Unpin, or
+replaced by a pin for the same scope and target) and it was `moved` and no pin left
+shows that terminal, the terminal gets a pane again if it is live:
+`run("terminal.keep", {terminal, place: "tab"})`, a new tab in the current space.
+Start rows never had a pane and are unchanged.
+
+**Moving the column**: `movePinsColumn(tree, where)` takes the `pins` node out (a
+`main-column`/`main-row` wrapper left with one child is replaced by it) and wraps
+the block with `content.tab: "active"` in `{ id: "main-column", type: "column",
+gap: 8 }` (bottom: pins after, top: before) or `{ id: "main-row", type: "row",
+gap: 8 }` (right: after, left: before). The pins node is kept whole, `size.px`
+included (a height in a column, a width in a row). The mod reads the layout file,
+moves, and writes `JSON.stringify(_, null, 2)` with `writeTextFile(path, text,
+expected)`, retrying once on a refused write; nothing to do when it is already
+there; a toast when the file has no pins column or tab block. Then it sets shared
+`pins.place` = `{ layout, where, at }`. The header knows it is in a row from its
+parent's type in the file (read on start) or a later `pins.place` for its layout.
+The fold's clicks (`layout.hide`/`resize` on `pins-terminal` and `pins`) survive a
+move: they belong to the ids.
+
 **Restart**: after a core restart a kept terminal comes back as a shell. When the
 pin has an `argv` and the live terminal's `foreground.argv[0]` (else `argv[0]`)
 differs from it by file name (`/opt/homebrew/bin/lazygit` matches `lazygit`), the
@@ -120,7 +153,9 @@ hc's error and pins nothing. The popup closes after a pick.
 
 **Keys**, through `nextCommand()` in the header copy (not the picker's):
 `pin` pins `focused().terminal` to the current space (scope space, no argv, its
-program's name as the label); `unpin` removes the current match. Hiding and
+program's name as the label, moving its pane in as above); `unpin` removes the
+current match; `pick` opens the picker; `move:<where>` moves the column (a
+`pins.move:right` key delivers `move:right`). Hiding and
 showing the column is Herdr's `layout.toggle:pins`, bound in keys.json.
 
 Programs only start from a Start or Restart click.
@@ -129,7 +164,7 @@ Programs only start from a Start or Restart click.
 ## Setup
 
 `setup.mjs` (Node, stdlib only; `node setup.mjs [--layout <name>] [--height <px>]
-[--dry-run]`) does the install in one step, because Herdr's `place` auto-dock does
+[--place bottom|top|right|left] [--dry-run]`) does the install in one step, because Herdr's `place` auto-dock does
 not help here: on a shipped layout it docks nothing, and on a personal one it wraps
 the whole window root in a column, spanning the sidebar. `mod.json` keeps
 `place: "none"`.
@@ -140,14 +175,14 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
 2. Layout: `--layout`, else `shared.json`'s `layout`, else `main`. `main`, `terminals`
    and `win98` are shipped: clone with `layout.clone` as `my-<name>` (an existing one is
    used as it is) and wait up to 5 s for the file.
-3. In the personal layout's JSON: a node with id `pins` means done. Else the block with
-   `content.tab: "active"` is replaced by a `main-column` column (gap 8) holding that
-   block and the README's pins column. No such block: fail, add it by hand. The file is
+3. In the personal layout's JSON: a node with id `pins` means done. Else the README's
+   pins column is added and moved to `--place` (default bottom) with `movePinsColumn`:
+   `insertPinsColumn(tree, { height, place })`. No such block: fail, add it by hand. The file is
    backed up to `<name>.json.before-pins` (unless that exists) and rewritten with
    `JSON.stringify(_, null, 2)`, so a hand-formatted layout loses its formatting.
 4. `layout.switch` if the window is not on that layout.
 
-The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`, tested in
+The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`, `isShipped`) are in `pins.js`, tested in
 `tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`.
 `--dry-run` makes no symlink, clone, write or switch.
 
@@ -165,8 +200,11 @@ The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`,
   (one pass over the text tracking strings and the open objects; the same text
   when the block is missing or already shows the address), `startArgs({ folder,
   machine, argv, name })`, `terminalName(what, folder, suffix)`,
-  `needsRestart(pin, term)`.
-- `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, with
+  `needsRestart(pin, term)`, `replacedPin(pins, pin)`, `paneBack(pin, pins)`,
+  `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`. The mod
+  runtime has no `structuredClone`: copy trees with a JSON round trip.
+- `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, `move`, `panel-bottom`,
+  `panel-top`, `panel-right`, `panel-left`, with
   `LICENSE-lucide.txt`.
 - `setup.mjs` at the repo root (see Setup).
 - `tests/pins.test.mjs`, `tests/setup.test.mjs` (node:test) and `tests/fixtures/layout.json`, a clone of
@@ -175,6 +213,9 @@ The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`,
 
 ## Watch out
 
+- Icons don't paint when `mods/pins` is a symlink to a folder outside
+  `~/.config/herdr-app` (as `setup.mjs` makes it); a real copy paints them. The
+  folded strip on the right or left is only an icon, so it looks empty then.
 - Never `layout.set`. In Herdr 0.1.11 it drops nodes from the tree and then
   keeps rewriting the layout file from its memory copy until the window
   restarts. Editing the file is the supported path.
@@ -200,7 +241,10 @@ The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`,
   per scope and target, the address swap in the fixture (only that line;
   identical text when equal or missing; a mod block has none), several terminal
   blocks with the id after the content, braces and escaped quotes in strings,
-  `hc run` arguments here, `--on` and for a shell, terminal names, and Restart.
+  `hc run` arguments here, `--on` and for a shell, terminal names, Restart, the
+  pin a pin replaces and when a pane comes back, and the column moved to all four
+  places (round trips, the same tree when already there, null cases, every other
+  node intact).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.
@@ -212,3 +256,11 @@ The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`,
   pin still wins in its space.
 - `herdr-app do pins.pin` pins the focused terminal to this space;
   `pins.unpin` brings back what showed before.
+- In a tab with two panes, `pins.pin` on one: it leaves the tab, the pins block
+  shows it tagged `this space`, `hc get` says `keep: true`. `pins.unpin`: it is a
+  tab of its own in the current space.
+- `pins.move:right` puts the column beside the tab area; `pins.move:bottom` puts it
+  back, and the layout file is as before (key order of the wrapper aside). Folded
+  on the right it is a 28px strip with the pin icon.
+- `node setup.mjs --layout terminals --place right` on a fresh clone puts the
+  column right of the tab area.
