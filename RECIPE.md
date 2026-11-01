@@ -126,6 +126,32 @@ showing the column is Herdr's `layout.toggle:pins`, bound in keys.json.
 Programs only start from a Start or Restart click.
 
 
+## Setup
+
+`setup.mjs` (Node, stdlib only; `node setup.mjs [--layout <name>] [--height <px>]
+[--dry-run]`) does the install in one step, because Herdr's `place` auto-dock does
+not help here: on a shipped layout it docks nothing, and on a personal one it wraps
+the whole window root in a column, spanning the sidebar. `mod.json` keeps
+`place: "none"`.
+
+1. Home is `$HERDR_APP_HOME`, else `~/.config/herdr-app`. Symlink `mods/pins` to
+   `<home>/mods/pins` if nothing is there (another thing there is kept, with a
+   message); then `herdr-app check` must pass.
+2. Layout: `--layout`, else `shared.json`'s `layout`, else `main`. `main`, `terminals`
+   and `win98` are shipped: clone with `layout.clone` as `my-<name>` (an existing one is
+   used as it is) and wait up to 5 s for the file.
+3. In the personal layout's JSON: a node with id `pins` means done. Else the block with
+   `content.tab: "active"` is replaced by a `main-column` column (gap 8) holding that
+   block and the README's pins column. No such block: fail, add it by hand. The file is
+   backed up to `<name>.json.before-pins` (unless that exists) and rewritten with
+   `JSON.stringify(_, null, 2)`, so a hand-formatted layout loses its formatting.
+4. `layout.switch` if the window is not on that layout.
+
+The pure parts (`insertPinsColumn`, `pinsColumn`, `isShipped`) are in `pins.js`, tested in
+`tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`.
+`--dry-run` makes no symlink, clone, write or switch.
+
+
 ## Built from
 
 - `mods/pins/`, `mod.json` `{ "place": "none", "title": "Pins" }`: it docks
@@ -142,7 +168,8 @@ Programs only start from a Start or Restart click.
   `needsRestart(pin, term)`.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, with
   `LICENSE-lucide.txt`.
-- `tests/pins.test.mjs` (node:test) and `tests/fixtures/layout.json`, a clone of
+- `setup.mjs` at the repo root (see Setup).
+- `tests/pins.test.mjs`, `tests/setup.test.mjs` (node:test) and `tests/fixtures/layout.json`, a clone of
   Herdr's `main` with the pins column.
 
 

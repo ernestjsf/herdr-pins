@@ -21,14 +21,26 @@ tabs always shows git for the repo you are in.
 
 ## Install
 
-Copy (or symlink) `mods/pins` into `~/.config/herdr-app/mods/` and run
-`herdr-app check ~/.config/herdr-app/mods/pins`.
+Clone the repo, then from its folder:
 
-Then add the column to a personal layout, that is, a file in
-`~/.config/herdr-app/layouts/` that you made or cloned (`herdr-app do layout.clone
-'{"name":"main","as":"my-layout"}'`). Herdr's own layouts are replaced on every
-start. To put it under the tabs of a `main` clone, wrap the `main` block in a
-column and add the pins column after it:
+```sh
+node setup.mjs
+```
+
+`setup.mjs` symlinks `mods/pins` into `~/.config/herdr-app/mods/`, clones the layout
+you are on into `my-<name>` if it is one of Herdr's own, puts the pins column under
+the tab area of that personal layout (the original is saved as
+`<name>.json.before-pins`), and switches the window to it. Run it again and it says
+`already set up`. Options: `--layout <name>`, `--height <px>` (default 360),
+`--dry-run` (print the plan, write nothing).
+
+## By hand, or somewhere else
+
+The column is a normal layout column and can sit anywhere in a personal layout, for
+example on the right. A personal layout is a file in `~/.config/herdr-app/layouts/`
+that you made or cloned (`herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`);
+Herdr's own layouts are replaced on every start. To put the column under the tabs,
+wrap the `main` block in a column and add the pins column after it:
 
 ```json
 { "id": "main-column", "type": "column", "gap": 8, "children": [
