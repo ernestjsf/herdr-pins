@@ -71,8 +71,7 @@ export default class Pins extends View {
 
   command(c) {
     const s = currentSpace();
-    if (c === "toggle") run("layout.toggle", { id: this.column });
-    else if (c === "unpin") {
+    if (c === "unpin") {
       const m = matchPin(pinList(), s);
       if (m) unpin(m);
     } else if (c === "pin") {
@@ -194,6 +193,7 @@ export default class Pins extends View {
       const cwd = place(s);
       const name = terminalName(row.argv?.[0] ?? "shell", cwd, Date.now().toString(36).slice(-4));
       const r = await hc(startArgs({ folder: cwd, machine: s.machine, argv: row.argv, name })).catch((e) => ({ code: 1, stdout: "", stderr: String(e) }));
+      this.busy = false;
       let address = null;
       try { address = JSON.parse(r.stdout).address; } catch {}
       if (r.code !== 0 || !address) {
