@@ -75,8 +75,7 @@ your layout's name:
     "cmd-alt-p": "pins.pin",
     "cmd-alt-u": "pins.unpin",
     "cmd-alt-o": "pins.pick",
-    "cmd-alt-l": "pins.move:right",
-    "cmd-alt-j": "layout.toggle:pins"
+    "cmd-alt-l": "pins.move:right"
   }
 }
 ```
@@ -85,10 +84,10 @@ your layout's name:
 - `pins.unpin` removes the pin shown for this space.
 - `pins.pick` opens the Pin… list for this space.
 - `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there.
-- `layout.toggle:pins` hides or shows the whole column. It is Herdr's own command,
-  not the mod's, because a hidden mod gets no key commands and could not show
-  the column again. Show it again before Herdr saves the layout: Herdr's own
-  save drops hidden nodes (RECIPE.md, Watch out).
+
+Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
+drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
+folds to its 28 px header on its own.
 
 ## lazygit in every repo
 

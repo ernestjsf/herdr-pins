@@ -162,8 +162,8 @@ hc's error and pins nothing. The popup closes after a pick.
 `pin` pins `focused().terminal` to the current space (scope space, no argv, its
 program's name as the label, moving its pane in as above); `unpin` removes the
 current match; `pick` opens the picker; `move:<where>` moves the column (a
-`pins.move:right` key delivers `move:right`). Hiding and
-showing the column is Herdr's `layout.toggle:pins`, bound in keys.json.
+`pins.move:right` key delivers `move:right`). There is no hide command: Herdr's
+save drops hidden nodes, and the fold already shrinks the column to its header.
 
 Programs only start from a Start or Restart click.
 
@@ -230,7 +230,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `pins-terminal` was dropped, `pins` unwrapped into `pins-header`, and the
   shipped `panel` column (one child) unwrapped too. Hence the fold never hides
   anything. The `panel` unwrap comes from Herdr's own layout and the mod can't
-  prevent it; nor can it stop `layout.toggle:pins` from hiding the whole column.
+  prevent it. The README tells people not to bind `layout.toggle:pins` for the
+  same reason.
   Recovery: `setup.mjs` keeps the layout as it was before the column as
   `<name>.json.before-pins`; copy it back and run setup again.
 - Never `layout.set`. In Herdr 0.1.11 it drops nodes from the tree and then
@@ -238,7 +239,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   restarts. Editing the file is the supported path.
 - `<mod>.<command>` reaches shown copies only. A hidden column's header gets no
   key commands, so a `pins.toggle` could hide the column but never show it
-  again: use `layout.toggle:pins`.
+  again. That, and the save bug above, is why there is no toggle.
 - A copy that isn't drawn doesn't render: with the screen locked or the window
   hidden, nothing swaps until it draws again (timers and `nextCommand` still run).
 - `hc run --name` must be unique among live terminals: hence the time suffix.
