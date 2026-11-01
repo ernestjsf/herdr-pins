@@ -86,7 +86,8 @@ your layout's name:
 - `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there.
 - `layout.toggle:pins` hides or shows the whole column. It is Herdr's own command,
   not the mod's, because a hidden mod gets no key commands and could not show
-  the column again.
+  the column again. Show it again before Herdr saves the layout: Herdr's own
+  save drops hidden nodes (RECIPE.md, Watch out).
 
 ## lazygit in every repo
 
@@ -105,8 +106,9 @@ file: when the space changes it reads the file, replaces the one `"terminal": "â
 value inside the `pins-terminal` block and writes it back only if the address changed
 (the write is refused if the file changed in between; it reads again and retries once).
 Nothing else in the file changes. The window picks the edit up within a second.
-Folding uses `layout.hide` on the terminal block and `layout.resize` on the column,
-which Herdr keeps as clicks, not in your file.
+Folding resizes the column to 28px and the terminal block to 0px and sets its address
+to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is hidden: when
+Herdr saves a layout itself it drops hidden nodes (see RECIPE.md, Watch out).
 
 Moving the column is a structural edit: the mod rewrites the whole layout file as
 2-space JSON with the column (and its `main-column` or `main-row` wrapper) moved,

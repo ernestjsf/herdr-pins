@@ -8,7 +8,7 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { spaces, focused, panes, terminals, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
+import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
 import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf } from "./pins.js";
 
 const HEADER = 28;
@@ -155,31 +155,37 @@ export default class Pins extends View {
   }
 
   // Show `want` in the block, or fold the column to its header (null). Runs when the match changes.
+  // The fold is resizes alone: Herdr's own layout save drops nodes hidden by a click and unwraps
+  // what is left, so the block is never hidden. Folded, the column is 28px and the block 0px
+  // (in a row the column is a strip and the block would fill it), with no terminal in it: its
+  // address is "", so no live terminal is squeezed to nothing.
   sync(cx, want) {
     if (want === this.want) return;
     this.want = want;
+    // An older version hid the block: show it once, or it stays hidden.
+    if (findNode(layout(), this.block)?.hidden) run("layout.show", { id: this.block });
     if (!want) {
-      run("layout.hide", { id: this.block });
       run("layout.resize", { id: this.column, px: HEADER });
-      return;
+      run("layout.resize", { id: this.block, px: 0 });
     }
     cx.spawn(async () => {
       const path = layoutFile();
       await this.write(path, want);
+      if (!want) return;
       const px = await this.height(path);
       if (this.want !== want) return;
-      run("layout.show", { id: this.block });
+      run("layout.resize", { id: this.block, weight: 1 });
       run("layout.resize", { id: this.column, px });
     });
   }
 
-  // Swap the block's address in the layout file; the window follows within a second.
-  // A stale snapshot rejects: read again and retry once.
+  // Swap the block's address in the layout file ("" when folded); the window follows within a
+  // second. A stale snapshot rejects: read again and retry once.
   async write(path, want) {
     for (let i = 0; i < 2; i++) {
       const text = await readTextFile(path);
       if (text == null || this.want !== want) return;
-      const next = replaceBlockTerminal(text, this.block, want);
+      const next = replaceBlockTerminal(text, this.block, want ?? "");
       if (next === text) return;
       try {
         await writeTextFile(path, next, text);
