@@ -3,19 +3,21 @@
 // current space (a space pin, else this machine's, else everywhere's) by rewriting that
 // block's one address in the layout file, and folds the column to its header when
 // nothing is pinned. Props: { block: "pins-terminal", column: "pins" }.
-// With props { picker: true, space } it is the Pin… popup instead, with { mover: true } the
-// Move… popup. Pins live in shared "pins.list".
+// With props { picker: true, space, terminal } it is the Pin… popup instead (the mod's keyboard
+// hub), with { mover: true } the Move… popup, with { starter: true } the Add a command dialog.
+// Pins live in shared "pins.list", the picker's Start rows in "pins.starters".
 
 import { View, div, svg, image } from "gpui-kit";
-import { h_flex, v_flex } from "gpui-base";
+import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
 const SCOPES = [["space", "Space"], ["machine", "Machine"], ["all", "All"]];
 const icon = (name) => `mods/pins/icons/${name}.svg`;
-const pickerHeight = (rows) => Math.min(440, 48 + rows * 30);
+// Title 28, two section headings 24 each, the two-line footer 36, padding 10, rows 30 each.
+const pickerHeight = (rows) => Math.min(480, 122 + rows * 30);
 const PLACES = [["bottom", "Bottom", "panel-bottom"], ["top", "Top", "panel-top"], ["right", "Right", "panel-right"], ["left", "Left", "panel-left"]];
 const layoutFile = () => `${appHome()}/layouts/${shared("layout")}.json`;
 
@@ -56,19 +58,35 @@ function unpin(pin) {
   giveBack(pin, next);
 }
 
-// Store a pin. A terminal whose tab has other panes moves into the pins block: its pane goes,
-// the terminal keeps running. A lone pane stays: parking it closes its tab, and the last tab
-// closes the space. A replaced pin that had moved its terminal gives it a pane back.
+// Store a pin. A terminal with a pane moves into the pins block: its pane goes (a lone pane's
+// tab closes), the terminal keeps running. A replaced pin that had moved its terminal gives it
+// a pane back.
 async function storePin(cx, pin) {
-  const list = pinList();
   const pane = panes().find((p) => p.terminal === pin.terminal);
-  const park = Boolean(pane) && panes().filter((p) => p.tab === pane.tab).length > 1;
+  const park = Boolean(pane) && await roomToPark(cx, pane);
+  const list = pinList();
   const moved = park || list.some((p) => p.terminal === pin.terminal && p.moved);
   const next = upsertPin(list, moved ? { ...pin, moved } : pin);
   setShared("pins.list", next);
   const old = replacedPin(list, pin);
   if (old) giveBack(old, next);
   if (park) await parkKept(cx, pin.terminal);
+}
+
+// Whether parking this pane leaves its space alive. The last pane of a space's last tab would
+// close the space: give the space a shell tab first (in its live folder), and wait up to 2 s
+// for it to show. It didn't: don't park, the pane stays where it is.
+async function roomToPark(cx, pane) {
+  const s = spaces().find((x) => x.tabs.some((t) => t.id === pane.tab));
+  if (!s) return false;
+  if (s.tabs.length > 1 || panes().filter((p) => p.tab === pane.tab).length > 1) return true;
+  run("tab.new", { space: s.id, folder: place(s) });
+  for (let i = 0; i < 20; i++) {
+    await cx.sleep(100);
+    if ((spaces().find((x) => x.id === s.id)?.tabs.length ?? 0) > 1) return true;
+  }
+  notify({ title: "The pane stays in its tab", body: `${s.name} got no new tab to keep it open`, level: "error" });
+  return false;
 }
 
 // terminal.park removes the pane and, once the core applies it, turns keep off: wait for that
@@ -114,11 +132,51 @@ function findNode(node, id) {
   return null;
 }
 
+const starterList = () => /** @type {any[]} */ (shared("pins.starters") ?? DEFAULT_STARTERS);
+
+// The picker's rows, in two sections. Start new: the starters, then Add a command…. Pin an open
+// terminal: the focused one first (when it isn't the one pinned here), then the space's other tab
+// terminals, each named by its tab ("2 · Claude Code") so two alike stay apart.
+function pickerRows(s, terminal) {
+  const start = "Start new", open = "Pin an open terminal";
+  const tabName = new Map(spaces().flatMap((x) => x.tabs.map((c) => [c.id, c.name])));
+  const paneRow = (p) => {
+    const name = ((p.program?.agent || p.program?.shell) && p.program.name) || p.title || p.program?.name || "shell";
+    return { section: open, terminal: p.terminal, name, label: `${tabName.get(p.tab)} · ${name}`, program: p.program, cwd: p.cwd };
+  };
+  const tabs = new Set((s?.tabs ?? []).map((c) => c.id));
+  const focusedPane = terminal && terminal !== matchPin(pinList(), s)?.terminal && panes().find((p) => p.terminal === terminal);
+  const self = focusedPane ? paneRow(focusedPane) : null;
+  const own = panes().filter((p) => p.terminal && p.terminal !== self?.terminal && tabs.has(p.tab)).map(paneRow);
+  return [
+    ...starterList().map((st) => ({ section: start, starter: st, argv: st.argv, name: st.argv ? st.label : "shell", label: st.argv ? `Start ${st.label} here` : "Start a shell here" })),
+    { section: start, add: true, label: "Add a command…" },
+    ...(self ? [{ ...self, self: true, label: `Pin this pane · ${self.label}` }] : []),
+    ...own,
+  ];
+}
+
+function openPicker(spaceId, terminal, kind) {
+  const s = spaces().find((x) => x.id === spaceId);
+  if (s) openOverlay({ mod: "pins", props: { picker: true, space: spaceId, terminal }, kind, width: 480, height: pickerHeight(pickerRows(s, terminal).length) });
+}
+
+function openStarter(spaceId, terminal) {
+  openOverlay({ mod: "pins", props: { starter: true, space: spaceId, terminal }, kind: "dialog", width: 420, height: 214 });
+}
+
 export default class Pins extends View {
   init(_props, cx) {
     this.hovered = false;
     this.want = undefined; // the address the block shows; null: folded to the header
-    if (props()?.picker || props()?.mover) return;
+    if (props()?.starter) this.initStarter(cx);
+    if (props()?.picker || props()?.mover || props()?.starter) {
+      this.at = props().mover ? 0 : -1; // the highlighted row; -1: not chosen yet
+      this.hoverRow = -1;
+      this.handle = cx.focus_handle();
+      if (!props().starter) this.handle.focus();
+      return;
+    }
     // In a row the folded column is a 28px-wide strip: the file says where it is, a later move
     // in this window says it through shared "pins.place".
     this.placedAt = shared("pins.place")?.at;
@@ -145,6 +203,8 @@ export default class Pins extends View {
       if (m) unpin(m);
     } else if (c === "pick") {
       this.openPicker(s, "dialog");
+    } else if (c === "add") {
+      if (s) openStarter(s.id, focused()?.terminal);
     } else if (c === "pin") {
       const t = focused()?.terminal;
       if (!t || !s) return;
@@ -215,14 +275,15 @@ export default class Pins extends View {
       .child(label);
   }
 
-  // From the header: a popup at the pointer. From a key: a centered dialog.
+  // From the header: a popup at the pointer. From a key: a centered dialog. The focused
+  // terminal is read now: once the popup has the keyboard, focus is the popup's.
   openPicker(s, kind = "popup") {
-    if (!s) return;
-    openOverlay({ mod: "pins", props: { picker: true, space: s.id }, kind, width: 440, height: pickerHeight(2 + this.paneRows(s).length) });
+    if (s) openPicker(s.id, focused()?.terminal, kind);
   }
 
   render(cx) {
     if (props()?.picker) return this.renderPicker();
+    if (props()?.starter) return this.renderStarter();
     if (props()?.mover) return this.renderMover();
     const t = theme();
     const s = currentSpace();
@@ -266,17 +327,6 @@ export default class Pins extends View {
         .when(Boolean(pin), (el) => el.child(this.button(t, "pins-unpin", "pin-off", "Unpin", () => unpin(pin)))));
   }
 
-  // The live terminals of a space's tabs, for the picker.
-  paneRows(s) {
-    const tabs = new Set(s.tabs.map((c) => c.id));
-    return panes().filter((p) => p.terminal && tabs.has(p.tab)).map((p) => ({
-      terminal: p.terminal,
-      label: ((p.program?.agent || p.program?.shell) && p.program.name) || p.title || p.program?.name || "shell",
-      program: p.program,
-      cwd: p.cwd,
-    }));
-  }
-
   // Pin a row for a scope, starting its program first when it is a Start row.
   async pick(spaceId, row, scope, cx) {
     const s = spaces().find((x) => x.id === spaceId);
@@ -286,7 +336,7 @@ export default class Pins extends View {
       this.busy = true;
       cx.notify();
       const cwd = place(s);
-      const name = terminalName(row.argv?.[0] ?? "shell", cwd, Date.now().toString(36).slice(-4));
+      const name = terminalName(row.name, cwd, Date.now().toString(36).slice(-4));
       const r = await hc(startArgs({ folder: cwd, machine: s.machine, argv: row.argv, name })).catch((e) => ({ code: 1, stdout: "", stderr: String(e) }));
       this.busy = false;
       let address = null;
@@ -297,49 +347,144 @@ export default class Pins extends View {
       }
       terminal = startedAddress(address, s.machine);
     }
-    await storePin(cx, { terminal, scope, space: s.id, machine: s.machine, folder: s.folder, argv: row.argv ?? null, name: row.argv?.[0] ?? row.label });
+    await storePin(cx, { terminal, scope, space: s.id, machine: s.machine, folder: s.folder, argv: row.argv ?? null, name: row.name });
   }
 
-  // The Move… popup: where the column goes beside the tab area. Esc closes it.
+  // The Move… popup: where the column goes beside the tab area. ↑/↓ and Enter, b t r l, Esc.
   renderMover() {
     const t = theme();
-    return v_flex().id("pins-mover").w_full().p(5).bg(t.popover).text_size(12.8)
-      .children(PLACES.map(([where, label, iconName]) => h_flex().id(`pins-move-${where}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
-        .text_color(t.foreground).hover((st) => st.bg(t.hover))
-        .on_click((_e, cx) => cx.spawn(async () => {
-          await moveColumn(where);
-          closeOverlay(props().overlay);
-        }))
+    const go = (where, cx) => cx.spawn(async () => {
+      await moveColumn(where);
+      closeOverlay(props().overlay);
+    });
+    return v_flex().id("pins-mover").track_focus(this.handle).w_full().p(5).bg(t.popover).text_size(12.8)
+      .on_key_down((e, cx) => {
+        const a = pickerAction(e.keystroke, { at: this.at, count: PLACES.length });
+        if (a?.do === "move") this.at = a.at;
+        else if (a?.do === "pin" && a.scope === "space") go(PLACES[this.at][0], cx);
+        else if (a?.do === "place") go(a.where, cx);
+        else if (a?.do === "close") closeOverlay(props().overlay);
+        else return;
+        cx.stop_propagation();
+        cx.notify();
+      })
+      .children(PLACES.map(([where, label, iconName], i) => h_flex().id(`pins-move-${where}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
+        .text_color(t.foreground).when(i === this.at, (el) => el.bg(t.hover)).hover((st) => st.bg(t.hover))
+        .on_click((_e, cx) => go(where, cx))
         .child(svg(icon(iconName)).size(13).flex_none().text_color(t.muted))
         .child(label)));
+  }
+
+  // What a picker key or click does to the highlighted row (`this.at`); see pickerAction.
+  act(a, rows, cx) {
+    const p = props(), r = rows[this.at];
+    const s = spaces().find((x) => x.id === p.space);
+    if (a.do === "move") this.at = a.at;
+    else if (a.do === "close") closeOverlay(p.overlay);
+    else if (a.do === "add" || (r?.add && a.do === "pin" && a.scope === "space")) {
+      closeOverlay(p.overlay);
+      openStarter(p.space, p.terminal);
+    } else if (a.do === "pin" && r && !r.add) {
+      cx.spawn(async (cx) => {
+        await this.pick(p.space, r, a.scope, cx);
+        closeOverlay(p.overlay);
+      });
+    } else if (a.do === "remove" && r?.starter) setShared("pins.starters", removeStarter(starterList(), r.starter));
+    else if (a.do === "unpin") {
+      const m = matchPin(pinList(), s);
+      if (m) unpin(m);
+      closeOverlay(p.overlay);
+    } else if (a.do === "go") {
+      const m = matchPin(pinList(), s);
+      closeOverlay(p.overlay);
+      if (m && live(m.terminal)) run("pane.focus", { terminal: m.terminal });
+    } else if (a.do === "place") cx.spawn(async () => {
+      await moveColumn(a.where);
+      closeOverlay(p.overlay);
+    });
   }
 
   renderPicker() {
     const t = theme();
     const s = spaces().find((x) => x.id === props().space);
-    const rows = [
-      { label: "Start lazygit here", argv: ["lazygit"] },
-      { label: "Start a shell here", argv: null },
-      ...(s ? this.paneRows(s) : []),
-    ];
+    const rows = pickerRows(s, props().terminal);
+    if (this.at < 0) this.at = Math.max(0, rows.findIndex((r) => r.self));
+    this.at = Math.min(this.at, rows.length - 1);
+    const choose = (i, a) => (_e, cx) => { cx.stop_propagation(); this.at = i; this.act(a, rows, cx); cx.notify(); };
+    const heading = (text) => div().h(24).flex_none().px(8).flex().items_end().pb(4).text_size(11).font_semibold().text_color(t.dim).child(text);
     const row = (r, i) => h_flex().id(`pins-row-${i}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
-      .hover((st) => st.bg(t.hover))
-      .child(r.terminal ? (programIcon(r.program, 14, t.muted) ?? div().w(14).flex_none()) : svg(icon("play")).size(13).flex_none().text_color(t.muted))
-      .child(div().flex_none().max_w(150).truncate().text_color(t.foreground).child(r.label))
-      .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(folder(r.terminal ? r.cwd : s && place(s))))
-      .children(SCOPES.map(([scope, label]) => div().id(`pins-${i}-${scope}`).flex_none().h(20).px(6).flex().items_center().rounded(5)
+      .when(i === this.at, (el) => el.bg(t.hover)).hover((st) => st.bg(t.hover))
+      .on_hover((on, cx) => { if (on) this.hoverRow = i; else if (this.hoverRow === i) this.hoverRow = -1; cx.notify(); })
+      .on_click(choose(i, { do: "pin", scope: "space" }))
+      .child(r.terminal ? (programIcon(r.program, 14, t.muted) ?? div().w(14).flex_none()) : svg(icon(r.add ? "plus" : "play")).size(13).flex_none().text_color(t.muted))
+      .child(div().flex_none().max_w(r.self ? 230 : 170).truncate().text_color(t.foreground).child(r.label))
+      .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(r.add ? "" : folder(r.terminal ? r.cwd : s && place(s))))
+      .when(Boolean(r.terminal), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(r.terminal)))
+      .when(Boolean(r.starter) && (i === this.at || i === this.hoverRow), (el) => el.child(div().id(`pins-${i}-remove`).flex_none().p(4).rounded(4)
+        .text_color(t.dim).hover((st) => st.bg(t.selected).text_color(t.foreground))
+        .on_click(choose(i, { do: "remove" })).child(svg(icon("x")).size(11))))
+      .when(!r.add, (el) => el.children(SCOPES.map(([scope, label]) => div().id(`pins-${i}-${scope}`).flex_none().h(20).px(6).flex().items_center().rounded(5)
         .border_1().border_color(t.border).text_size(11).text_color(t.muted)
         .hover((st) => st.bg(t.selected).text_color(t.foreground))
-        .on_click((_e, cx) => cx.spawn(async (cx) => {
-          await this.pick(props().space, r, scope, cx);
-          closeOverlay(props().overlay);
-        }))
-        .child(label)));
-    return v_flex().id("pins-picker").w_full().h(pickerHeight(rows.length)).min_h(0).p(5).bg(t.popover).text_size(12.8)
+        .on_click(choose(i, { do: "pin", scope }))
+        .child(label))));
+    const body = rows.flatMap((r, i) => [...(i === 0 || rows[i - 1].section !== r.section ? [heading(r.section)] : []), row(r, i)]);
+    const hint = (text) => div().truncate().child(text);
+    return v_flex().id("pins-picker").track_focus(this.handle).w_full().h(pickerHeight(rows.length)).min_h(0).p(5).bg(t.popover).text_size(12.8)
+      .on_key_down((e, cx) => {
+        const a = pickerAction(e.keystroke, { at: this.at, count: rows.length });
+        if (!a) return;
+        cx.stop_propagation();
+        this.act(a, rows, cx);
+        cx.notify();
+      })
       .child(h_flex().h(28).flex_none().pl(8).items_center().text_size(11).text_color(t.dim)
         .child(div().flex_1().truncate().child(this.busy ? "Starting…" : `Pin in ${s?.name ?? "this space"}: for this space, this machine, or all`))
         .child(div().id("pins-close").p(4).rounded(4).hover((st) => st.bg(t.hover).text_color(t.foreground))
           .on_click(() => closeOverlay(props().overlay)).child(svg(icon("x")).size(12))))
-      .child(v_flex().id("pins-rows").flex_1().min_h(0).overflow_y_scrollbar().children(rows.map(row)));
+      .child(v_flex().id("pins-rows").flex_1().min_h(0).overflow_y_scrollbar().children(body))
+      .child(v_flex().h(36).flex_none().px(8).pt(6).justify_center().border_t(1).border_color(t.border).text_size(11).text_color(t.dim)
+        .child(hint("↑↓ choose · ⏎ space · m machine · a all · u unpin · g go"))
+        .child(hint("b t r l move · n new · x remove · esc")));
+  }
+
+  // The Add a command dialog: one line, Enter adds it to the Start rows and reopens the picker.
+  initStarter(cx) {
+    this.input = InputState.new({ value: "" });
+    this.input.on("change", (_e, cx) => cx.notify());
+    this.input.on("submit", () => this.saveStarter());
+    this.inputFocused = true;
+    this.input.on("focus", (_e, cx) => { this.inputFocused = true; cx.notify(); });
+    this.input.on("blur", (_e, cx) => { this.inputFocused = false; cx.notify(); });
+    this.input.focus();
+    cx.timer.after(600, () => this.input.focus());
+  }
+
+  saveStarter() {
+    const p = props();
+    const st = starterFromText(this.input.value());
+    if (!st) return;
+    setShared("pins.starters", addStarter(starterList(), st));
+    closeOverlay(p.overlay);
+    openPicker(p.space, p.terminal, "dialog");
+  }
+
+  renderStarter() {
+    const t = theme();
+    const p = props();
+    const button = (id, text, primary, action) => h_flex().id(id).h(32).px(14).items_center().rounded(8)
+      .border_1().border_color(primary ? t.solid : t.input).bg(primary ? t.solid : t.raised)
+      .text_color(primary ? t.solid_foreground : t.foreground).text_size(12.5).font_medium().cursor_pointer()
+      .hover((st) => st.opacity(0.88)).on_click(action).child(text);
+    return v_flex().id("pins-starter").track_focus(this.handle).w_full().min_h(0).p(18).bg(t.popover).text_color(t.foreground)
+      .on_key_down((e, cx) => { if (e.key === "escape") { closeOverlay(p.overlay); cx.stop_propagation(); } })
+      .child(h_flex().items_center().child(div().flex_1().text_size(15).font_semibold().child("Add a command"))
+        .child(div().text_size(11).text_color(t.dim).child("Esc")))
+      .child(div().pt(16).pb(7).text_size(11.5).text_color(t.dim).child("Command"))
+      .child(Input.new(this.input).h(36).px(10).rounded(9).border_1().border_color(this.inputFocused ? t.accent : t.input).bg(t.background).text_size(12.8).text_color(t.foreground))
+      .child(div().pt(6).text_size(11.5).text_color(t.dim).child("Starts in the space's folder, split on spaces: htop, npm run dev"))
+      .child(h_flex().pt(20).gap(8).justify_end()
+        .child(button("pins-starter-cancel", "Cancel", false, () => closeOverlay(p.overlay)))
+        .child(button("pins-starter-add", "Add", true, () => this.saveStarter())));
   }
 }
