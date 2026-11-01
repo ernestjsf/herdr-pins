@@ -3,19 +3,21 @@
 // current space (a space pin, else this machine's, else everywhere's) by rewriting that
 // block's one address in the layout file, and folds the column to its header when
 // nothing is pinned. Props: { block: "pins-terminal", column: "pins" }.
-// With props { picker: true, space } it is the Pin… popup instead.
-// Pins live in shared "pins.list".
+// With props { picker: true, space } it is the Pin… popup instead, with { mover: true } the
+// Move… popup. Pins live in shared "pins.list".
 
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { spaces, focused, panes, terminals, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replaceBlockTerminal, startArgs, terminalName, needsRestart } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, terminalName, needsRestart, movePinsColumn, parentOf } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
 const SCOPES = [["space", "Space"], ["machine", "Machine"], ["all", "All"]];
 const icon = (name) => `mods/pins/icons/${name}.svg`;
 const pickerHeight = (rows) => Math.min(440, 48 + rows * 30);
+const PLACES = [["bottom", "Bottom", "panel-bottom"], ["top", "Top", "panel-top"], ["right", "Right", "panel-right"], ["left", "Left", "panel-left"]];
+const layoutFile = () => `${appHome()}/layouts/${shared("layout")}.json`;
 
 function programIcon(p, size, color) {
   if (!p?.icon) return null;
@@ -42,7 +44,65 @@ function currentSpace() {
 const pinList = () => /** @type {any[]} */ (shared("pins.list") ?? []);
 const live = (address) => terminals().find((t) => t.address === address && t.state === "live");
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const unpin = (pin) => setShared("pins.list", pinList().filter((p) => !same(p, pin)));
+
+// A pin that took its terminal out of its tab gives it a pane back (a new tab here) when it goes.
+function giveBack(pin, pins) {
+  if (paneBack(pin, pins) && live(pin.terminal)) run("terminal.keep", { terminal: pin.terminal, place: "tab" });
+}
+
+function unpin(pin) {
+  const next = pinList().filter((p) => !same(p, pin));
+  setShared("pins.list", next);
+  giveBack(pin, next);
+}
+
+// Store a pin. A terminal whose tab has other panes moves into the pins block: its pane goes,
+// the terminal keeps running. A lone pane stays: parking it closes its tab, and the last tab
+// closes the space. A replaced pin that had moved its terminal gives it a pane back.
+async function storePin(cx, pin) {
+  const list = pinList();
+  const pane = panes().find((p) => p.terminal === pin.terminal);
+  const park = Boolean(pane) && panes().filter((p) => p.tab === pane.tab).length > 1;
+  const moved = park || list.some((p) => p.terminal === pin.terminal && p.moved);
+  const next = upsertPin(list, moved ? { ...pin, moved } : pin);
+  setShared("pins.list", next);
+  const old = replacedPin(list, pin);
+  if (old) giveBack(old, next);
+  if (park) await parkKept(cx, pin.terminal);
+}
+
+// terminal.park removes the pane and, once the core applies it, turns keep off: wait for that
+// (at most 3 s), then turn keep back on so the terminal outlives a core loss like a tab's does.
+async function parkKept(cx, terminal) {
+  run("terminal.park", { terminal });
+  for (let i = 0; i < 10; i++) {
+    await cx.sleep(300);
+    const r = await hc(["get", terminal]).catch(() => null);
+    try { if (JSON.parse(r.stdout).keep === false) break; } catch {}
+  }
+  await hc(["keep", terminal]).catch(() => {});
+}
+
+// Move the column beside the tab area in the layout file. A structural edit, so the file is
+// rewritten whole (2-space JSON); the window reloads it and the clicks (the fold) follow the ids.
+async function moveColumn(where) {
+  const layout = shared("layout");
+  const path = layoutFile();
+  for (let i = 0; i < 2; i++) {
+    const text = await readTextFile(path);
+    if (text == null) return;
+    let tree;
+    try { tree = JSON.parse(text); } catch { return; }
+    const next = movePinsColumn(tree, where);
+    if (!next) return notify({ title: "Couldn't move the pins column", body: `${layout} has no pins column next to a tab area`, level: "error" });
+    if (next === tree) return;
+    try {
+      await writeTextFile(path, JSON.stringify(next, null, 2) + "\n", text);
+      setShared("pins.place", { layout, where, at: Date.now() });
+      return;
+    } catch {}
+  }
+}
 
 function findNode(node, id) {
   if (!node || typeof node !== "object") return null;
@@ -58,10 +118,17 @@ export default class Pins extends View {
   init(_props, cx) {
     this.hovered = false;
     this.want = undefined; // the address the block shows; null: folded to the header
-    if (props()?.picker) return;
+    if (props()?.picker || props()?.mover) return;
+    // In a row the folded column is a 28px-wide strip: the file says where it is, a later move
+    // in this window says it through shared "pins.place".
+    this.placedAt = shared("pins.place")?.at;
+    cx.spawn(async (cx) => {
+      try { this.row = parentOf(JSON.parse(await readTextFile(layoutFile())), this.column)?.type === "row"; } catch {}
+      cx.notify();
+    });
     cx.spawn(async (cx) => {
       for (;;) {
-        this.command(await nextCommand());
+        await this.command(await nextCommand(), cx);
         cx.notify();
       }
     });
@@ -70,8 +137,9 @@ export default class Pins extends View {
   get block() { return props()?.block ?? "pins-terminal"; }
   get column() { return props()?.column ?? "pins"; }
 
-  command(c) {
+  async command(c, cx) {
     const s = currentSpace();
+    const move = /^move[:-](bottom|top|right|left)$/.exec(c);
     if (c === "unpin") {
       const m = matchPin(pinList(), s);
       if (m) unpin(m);
@@ -80,7 +148,9 @@ export default class Pins extends View {
     } else if (c === "pin") {
       const t = focused()?.terminal;
       if (!t || !s) return;
-      setShared("pins.list", upsertPin(pinList(), { terminal: t, scope: "space", space: s.id, machine: s.machine, folder: s.folder, argv: null, name: live(t)?.program?.name ?? t }));
+      await storePin(cx, { terminal: t, scope: "space", space: s.id, machine: s.machine, folder: s.folder, argv: null, name: live(t)?.program?.name ?? t });
+    } else if (move) {
+      await moveColumn(move[1]);
     }
   }
 
@@ -94,7 +164,7 @@ export default class Pins extends View {
       return;
     }
     cx.spawn(async () => {
-      const path = `${appHome()}/layouts/${shared("layout")}.json`;
+      const path = layoutFile();
       await this.write(path, want);
       const px = await this.height(path);
       if (this.want !== want) return;
@@ -142,11 +212,20 @@ export default class Pins extends View {
 
   render(cx) {
     if (props()?.picker) return this.renderPicker();
+    if (props()?.mover) return this.renderMover();
     const t = theme();
     const s = currentSpace();
     const pin = matchPin(pinList(), s);
     const term = pin && live(pin.terminal);
     this.sync(cx, term ? pin.terminal : null);
+    const placed = shared("pins.place");
+    const row = placed && placed.at !== this.placedAt && placed.layout === shared("layout") ? placed.where === "right" || placed.where === "left" : this.row;
+    // Folded in a row: a 28px-wide strip, too narrow for text. The pin icon; a click opens Pin….
+    if (row && !term) {
+      return h_flex().id("pins-head").size_full().justify_center().items_center().bg(t.background)
+        .on_click(() => this.openPicker(s))
+        .child(svg(icon("pin")).size(13).flex_none().text_color(pin ? t.accent : t.dim));
+    }
     const pic = term && programIcon(term.program, 14, t.dim);
     return h_flex()
       .id("pins-head")
@@ -168,6 +247,7 @@ export default class Pins extends View {
         .when(needsRestart(pin, term), (el) => el.child(this.button(t, "pins-restart", "refresh", "Restart", () => hc(["send", pin.terminal, pin.argv.join(" ")])))))
       .when(this.hovered, (el) => el
         .child(this.button(t, "pins-pick", "pin", "Pin…", () => this.openPicker(s)))
+        .child(this.button(t, "pins-move", "move", "Move…", () => openOverlay({ mod: "pins", props: { mover: true }, kind: "popup", width: 160, height: 130 })))
         .when(Boolean(pin), (el) => el.child(this.button(t, "pins-unpin", "pin-off", "Unpin", () => unpin(pin)))));
   }
 
@@ -202,7 +282,21 @@ export default class Pins extends View {
       }
       terminal = s.machine ? `${s.machine}/${address}` : address;
     }
-    setShared("pins.list", upsertPin(pinList(), { terminal, scope, space: s.id, machine: s.machine, folder: s.folder, argv: row.argv ?? null, name: row.argv?.[0] ?? row.label }));
+    await storePin(cx, { terminal, scope, space: s.id, machine: s.machine, folder: s.folder, argv: row.argv ?? null, name: row.argv?.[0] ?? row.label });
+  }
+
+  // The Move… popup: where the column goes beside the tab area. Esc closes it.
+  renderMover() {
+    const t = theme();
+    return v_flex().id("pins-mover").w_full().p(5).bg(t.popover).text_size(12.8)
+      .children(PLACES.map(([where, label, iconName]) => h_flex().id(`pins-move-${where}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
+        .text_color(t.foreground).hover((st) => st.bg(t.hover))
+        .on_click((_e, cx) => cx.spawn(async () => {
+          await moveColumn(where);
+          closeOverlay(props().overlay);
+        }))
+        .child(svg(icon(iconName)).size(13).flex_none().text_color(t.muted))
+        .child(label)));
   }
 
   renderPicker() {
