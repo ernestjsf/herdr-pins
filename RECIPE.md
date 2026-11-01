@@ -95,8 +95,7 @@ differs from what it last asked for:
   `size.px` in the layout file (240 if missing or not above 28).
 
 Nothing else in the file is touched: no reformatting, no reordering. The window
-reloads the edited layout by itself; the header's copy lives on, since its block
-is unchanged.
+reloads the edited layout by itself.
 
 **The header**: a click on the row focuses the terminal block
 (`pane.focus {terminal}`) when the pinned terminal is live. Pin… opens the
