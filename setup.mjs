@@ -5,7 +5,7 @@ import { copyFileSync, constants, cpSync, existsSync, lstatSync, readFileSync, u
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addKey, insertPinsColumn, isShipped } from "./mods/pins/pins.js";
+import { addKey, insertPinsColumn, isShipped, repairPinsColumn } from "./mods/pins/pins.js";
 
 const say = (s) => console.log(s);
 const fail = (s) => { console.error(`setup: ${s}`); process.exit(1); };
@@ -68,7 +68,13 @@ else if (isShipped(picked)) say(`using existing ${name}`);
 // 4. the column (a dry run of a not-yet-cloned layout reads the shipped file)
 const source = existsSync(file(name)) ? file(name) : file(picked);
 const text = readFileSync(source, "utf8");
-const tree = JSON.parse(text);
+const parsed = JSON.parse(text);
+// Herdr's own save can drop the column's terminal block and leave the header loose: rebuild it.
+const tree = repairPinsColumn(parsed);
+if (tree !== parsed) {
+  say(`${dry ? "would repair" : "repaired"} the pins column in ${name} (a Herdr layout save dropped its terminal block)`);
+  if (!dry) writeFileSync(file(name), JSON.stringify(tree, null, 2) + "\n");
+}
 const next = insertPinsColumn(tree, { height, place });
 if (next === tree) { say(`${name}: already set up (move the column with Move… in its header)`); await keys(); process.exit(0); }
 if (!next) fail(`${name} has no block with content.tab "active"; add the column by hand (see README)`);

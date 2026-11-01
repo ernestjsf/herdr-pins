@@ -234,3 +234,26 @@ export function addKey(keys, section, chord, command) {
   if (Object.values(keys ?? {}).some((s) => s && typeof s === "object" && chord in s)) return null;
   return { ...keys, [section]: { ...keys?.[section], [chord]: command } };
 }
+
+// Herdr's own layout save drops a hidden or 0px node and unwraps a container left with one
+// child: the column's terminal block goes and the header (the block showing this mod) is left
+// loose where the column was. A copy of the tree with the column rebuilt around the header, in
+// its place, at 360px (a block that survived elsewhere moves in); the same tree when the column
+// is there or there is no header. Ids come from the header's props, as the mod reads them.
+export function repairPinsColumn(tree) {
+  const findHeader = (n) => (n.content?.mod === "pins" ? n : (n.children ?? []).map(findHeader).find(Boolean));
+  const found = findHeader(tree);
+  if (!found) return tree;
+  const props = found.content.props;
+  const column = props?.column ?? "pins", block = props?.block ?? "pins-terminal";
+  if (hasId(tree, column)) return tree;
+  const out = JSON.parse(JSON.stringify(tree));
+  const header = findHeader(out);
+  const holderOf = (n, x) => ((n.children ?? []).includes(x) ? n : (n.children ?? []).map((c) => holderOf(c, x)).find(Boolean));
+  const old = parentOf(out, block);
+  const terminal = old ? old.children.splice(old.children.findIndex((c) => c.id === block), 1)[0] : { id: block, type: "block", content: { terminal: "" } };
+  const holder = holderOf(out, header);
+  if (!holder) return tree; // the header is the root: nothing to rebuild around
+  holder.children[holder.children.indexOf(header)] = { ...pinsColumn(), id: column, children: [header, terminal] };
+  return out;
+}

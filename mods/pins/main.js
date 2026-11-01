@@ -10,7 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
@@ -122,6 +122,22 @@ async function moveColumn(where) {
   }
 }
 
+// The layout file's text, with the pins column rebuilt first when Herdr's own save dropped part
+// of it (see repairPinsColumn). Null when there is no file. A refused write means another copy
+// changed the file meanwhile: read it again.
+async function readRepaired(path) {
+  const text = await readTextFile(path);
+  if (text == null) return null;
+  let tree;
+  try { tree = JSON.parse(text); } catch { return text; }
+  const fixed = repairPinsColumn(tree);
+  if (fixed === tree) return text;
+  const next = JSON.stringify(fixed, null, 2) + "\n";
+  try { await writeTextFile(path, next, text); } catch { return readTextFile(path); }
+  notify({ title: "Pins column repaired after a Herdr layout save", level: "info" });
+  return next;
+}
+
 function findNode(node, id) {
   if (!node || typeof node !== "object") return null;
   if (node.id === id) return node;
@@ -181,7 +197,7 @@ export default class Pins extends View {
     // in this window says it through shared "pins.place".
     this.placedAt = shared("pins.place")?.at;
     cx.spawn(async (cx) => {
-      try { this.row = parentOf(JSON.parse(await readTextFile(layoutFile())), this.column)?.type === "row"; } catch {}
+      try { this.row = parentOf(JSON.parse(await readRepaired(layoutFile())), this.column)?.type === "row"; } catch {}
       cx.notify();
     });
     cx.spawn(async (cx) => {
@@ -248,7 +264,7 @@ export default class Pins extends View {
   // second. A stale snapshot rejects: read again and retry once.
   async write(path, want) {
     for (let i = 0; i < 2; i++) {
-      const text = await readTextFile(path);
+      const text = await readRepaired(path);
       if (text == null || this.want !== want) return;
       const next = replaceBlockTerminal(text, this.block, want ?? "");
       if (next === text) return;

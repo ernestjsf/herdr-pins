@@ -139,6 +139,9 @@ space's last pane would close the space, so the mod first opens a shell tab ther
 (`tab.new`, in the space's live folder) and parks only once it shows (within 2 s; else the
 pane stays and a toast says so).
 
+If Herdr's own layout save drops part of the column anyway, the mod puts it back the
+next time it reads the file (a toast says so), and `node setup.mjs` does the same.
+
 Pins live in Herdr's shared state under `pins.list`. The column opens at the
 `size.px` in your layout file: raise it there. lazygit wants about 360 px.
 

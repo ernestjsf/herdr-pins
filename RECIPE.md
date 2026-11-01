@@ -150,6 +150,18 @@ shows that terminal, the terminal gets a pane again if it is live:
 `run("terminal.keep", {terminal, place: "tab"})`, a new tab in the current space.
 Start rows never had a pane and are unchanged.
 
+**Repair**: Herdr's own save can drop the folded block and leave the header loose
+(see Watch out). `repairPinsColumn(tree)`: when a block shows this mod
+(`content.mod: "pins"`) and no node has the column's id (the header's `props.column`,
+default `pins`), the header is replaced, where it stands, by `pinsColumn()` (360px)
+with the header itself and the terminal block (`props.block`, default
+`pins-terminal`; moved in when it survived elsewhere, else `{ "terminal": "" }`). A
+wrapper the header was alone in stays. Same tree otherwise. The header runs it on
+start (the read that finds whether it is in a row) and on every read for a swap,
+before anything else: when it changed the tree it writes the file (2-space JSON, the
+expected-text check as usual; a refused write reads again) and toasts `Pins column
+repaired after a Herdr layout save`.
+
 **Moving the column**: `movePinsColumn(tree, where)` takes the `pins` node out (a
 `main-column`/`main-row` wrapper left with one child is replaced by it) and wraps
 the block with `content.tab: "active"` in `{ id: "main-column", type: "column",
@@ -226,7 +238,8 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
 2. Layout: `--layout`, else `shared.json`'s `layout`, else `main`. `main`, `terminals`
    and `win98` are shipped: clone with `layout.clone` as `my-<name>` (an existing one is
    used as it is) and wait up to 5 s for the file.
-3. In the personal layout's JSON: a node with id `pins` means done. Else the README's
+3. In the personal layout's JSON: first `repairPinsColumn` (see Repair), written back
+   with `repaired the pins column…` when it changed anything. Then a node with id `pins` means done. Else the README's
    pins column is added and moved to `--place` (default bottom) with `movePinsColumn`:
    `insertPinsColumn(tree, { height, place })`. No such block: fail, add it by hand. The file is
    backed up to `<name>.json.before-pins` (unless that exists) and rewritten with
@@ -242,7 +255,8 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
    `cmd-}` count as different chords.
 
 The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`, `isShipped`, `addKey`) are in `pins.js`, tested in
-`tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`.
+`tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`, and `tests/fixtures/broken.json`,
+`my-main` as Herdr's save left it (the header loose in `main-row`).
 `--dry-run` makes no copy, clone, write or switch.
 
 
@@ -265,7 +279,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`,
   `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
-  section, chord, command)`. The mod
+  section, chord, command)`, `repairPinsColumn(tree)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -317,8 +331,10 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   pin a pin replaces and when a pane comes back, and the column moved to all four
   places (round trips, the same tree when already there, null cases, every other
   node intact), the picker's key mapping, starters from text and the list's add
-  and remove, and `addKey` (adds, refuses a chord bound in any section, keeps the
-  rest).
+  and remove, `addKey` (adds, refuses a chord bound in any section, keeps the
+  rest), and `repairPinsColumn` on the broken `my-main` (the column back under
+  `main-row`, nothing else changed; a whole tree untouched; a lone header keeps its
+  wrapper; a surviving block moves in once).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.

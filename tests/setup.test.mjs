@@ -134,3 +134,47 @@ test("addKey: null when the chord is bound in any section", () => {
   assert.equal(P.addKey(keys, "layout:my-main", "cmd-alt-o", "pins.pick"), null);
   assert.equal(P.addKey({ "layout:other": { "cmd-alt-o": "pins.pick" } }, "layout:my-main", "cmd-alt-o", "pins.pick"), null);
 });
+
+// fixtures/broken.json is my-main after Herdr's own save dropped the 0px pins-terminal and
+// unwrapped pins into a loose pins-header in main-row (2 Nov 2026).
+const broken = JSON.parse(readFileSync(new URL("fixtures/broken.json", import.meta.url), "utf8"));
+
+test("repairPinsColumn: a loose header becomes the column again, in its place", () => {
+  const before = structuredClone(broken);
+  const out = P.repairPinsColumn(broken);
+  assert.deepEqual(broken, before);
+  assert.deepEqual(ids(find(out, "main-row")), ["main", "pins"]);
+  assert.deepEqual(ids(find(out, "pins")), ["pins-header", "pins-terminal"]);
+  assert.deepEqual(find(out, "pins-header").content, { mod: "pins", props: { block: "pins-terminal" } });
+  assert.deepEqual(find(out, "pins-terminal").content, { terminal: "" });
+  assert.equal(find(out, "pins").size.px, 360);
+  assert.equal(P.pinsPlace(out), "right");
+  // Nothing else changed.
+  const back = structuredClone(out);
+  find(back, "main-row").children[1] = find(broken, "pins-header");
+  assert.deepEqual(back, broken);
+});
+
+test("repairPinsColumn: the same tree when the column is whole or there is no header", () => {
+  assert.equal(P.repairPinsColumn(placed), placed);
+  assert.equal(P.repairPinsColumn(main), main);
+  const repaired = P.repairPinsColumn(broken);
+  assert.equal(P.repairPinsColumn(repaired), repaired);
+});
+
+test("repairPinsColumn: a header left alone in its wrapper keeps the wrapper", () => {
+  const header = { id: "pins-header", type: "block", size: { px: 28 }, content: { mod: "pins", props: { block: "pins-terminal" } } };
+  const tree = { id: "root", type: "row", children: [{ id: "main", type: "block", content: { tab: "active" } }, { id: "main-column", type: "column", gap: 8, children: [header] }] };
+  const out = P.repairPinsColumn(tree);
+  assert.deepEqual(ids(find(out, "main-column")), ["pins"]);
+  assert.deepEqual(ids(find(out, "pins")), ["pins-header", "pins-terminal"]);
+});
+
+test("repairPinsColumn: a block that survived elsewhere moves into the column, never twice", () => {
+  const t = structuredClone(broken);
+  find(t, "work-body").children.push({ id: "pins-terminal", type: "block", content: { terminal: "t9" } });
+  const out = P.repairPinsColumn(t);
+  assert.deepEqual(ids(find(out, "pins")), ["pins-header", "pins-terminal"]);
+  assert.equal(find(out, "pins-terminal").content.terminal, "t9");
+  assert.deepEqual(ids(find(out, "work-body")), ["main-row", "panel-body"]);
+});
