@@ -9,7 +9,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { spaces, focused, panes, terminals, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, terminalName, needsRestart, movePinsColumn, parentOf } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
@@ -280,7 +280,7 @@ export default class Pins extends View {
         notify({ title: "Couldn't start it", body: (r.stderr || r.stdout).trim(), level: "error" });
         return;
       }
-      terminal = s.machine ? `${s.machine}/${address}` : address;
+      terminal = startedAddress(address, s.machine);
     }
     await storePin(cx, { terminal, scope, space: s.id, machine: s.machine, folder: s.folder, argv: row.argv ?? null, name: row.argv?.[0] ?? row.label });
   }

@@ -66,6 +66,12 @@ test("upsertPin: one pin per scope and target", () => {
   assert.deepEqual(P.upsertPin(null, a), [a]);
 });
 
+test("startedAddress: the machine prefix once, whatever hc printed", () => {
+  assert.equal(P.startedAddress("t66", null), "t66");
+  assert.equal(P.startedAddress("t10", "omarchy"), "omarchy/t10");
+  assert.equal(P.startedAddress("omarchy/t10", "omarchy"), "omarchy/t10");
+});
+
 test("replacedPin: the pin at the same scope and target, else null", () => {
   const s1 = pin("space", "t3", { space: "sp1" });
   const a = pin("all", "t1");

@@ -93,6 +93,12 @@ export function startArgs({ folder, machine, argv, name }) {
   ];
 }
 
+// The address `hc run --json` printed, as the app names it: `<machine>/t9` for another
+// machine. Core 0.1.15 prints it with the prefix already; older cores printed it bare.
+export function startedAddress(address, machine) {
+  return machine && !address.includes("/") ? `${machine}/${address}` : address;
+}
+
 // A name hc accepts (1-32 of a-z 0-9 - _), unique enough: pin-<what>-<folder>-<suffix>.
 export function terminalName(what, folder, suffix) {
   const slug = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");

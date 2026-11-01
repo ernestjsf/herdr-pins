@@ -147,8 +147,9 @@ program in the space's current folder (its first tab pane's live folder, else
 --name <name> --cwd <folder> [--on <machine>] --json [-- <argv…>]`, no argv for the
 shell (hc then starts that machine's shell). The name is `pin-<program>-<folder's
 last part>-<4 characters of the time in base 36>`, lowercased, other characters
-as `-`, at most 32. The printed `address` is bare even with `--on`: prefix
-`<machine>/` for a remote space. A failed start toasts `Couldn't start it` with
+as `-`, at most 32. With `--on`, core 0.1.15 prints the
+`address` already prefixed (`omarchy/t10`; older cores printed it bare):
+`startedAddress(address, machine)` adds `<machine>/` only when there is no `/`. A failed start toasts `Couldn't start it` with
 hc's error and pins nothing. The popup closes after a pick.
 
 **Keys**, through `nextCommand()` in the header copy (not the picker's):
@@ -200,7 +201,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   (one pass over the text tracking strings and the open objects; the same text
   when the block is missing or already shows the address), `startArgs({ folder,
   machine, argv, name })`, `terminalName(what, folder, suffix)`,
-  `needsRestart(pin, term)`, `replacedPin(pins, pin)`, `paneBack(pin, pins)`,
+  `needsRestart(pin, term)`, `startedAddress(address, machine)`, `replacedPin(pins, pin)`, `paneBack(pin, pins)`,
   `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, `move`, `panel-bottom`,
