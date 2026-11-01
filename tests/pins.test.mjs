@@ -168,3 +168,47 @@ test("needsRestart: only a pinned program that came back as something else", () 
   assert.equal(P.needsRestart(pin("all", "t1"), { foreground: { argv: ["/bin/zsh"] } }), false);
   assert.equal(P.needsRestart(lg, null), false);
 });
+
+test("pickerAction: arrows wrap, letters pick a scope or an action, others do nothing", () => {
+  assert.deepEqual(P.pickerAction("down", { at: 0, count: 3 }), { do: "move", at: 1 });
+  assert.deepEqual(P.pickerAction("down", { at: 2, count: 3 }), { do: "move", at: 0 });
+  assert.deepEqual(P.pickerAction("up", { at: 0, count: 3 }), { do: "move", at: 2 });
+  assert.deepEqual(P.pickerAction("up", { at: 2, count: 3 }), { do: "move", at: 1 });
+  assert.deepEqual(P.pickerAction("enter", { at: 1, count: 3 }), { do: "pin", scope: "space" });
+  assert.deepEqual(P.pickerAction("m", { at: 1, count: 3 }), { do: "pin", scope: "machine" });
+  assert.deepEqual(P.pickerAction("a", { at: 1, count: 3 }), { do: "pin", scope: "all" });
+  assert.deepEqual(P.pickerAction("u", { at: 1, count: 3 }), { do: "unpin" });
+  assert.deepEqual(P.pickerAction("g", { at: 1, count: 3 }), { do: "go" });
+  assert.deepEqual(P.pickerAction("b", { at: 1, count: 3 }), { do: "place", where: "bottom" });
+  assert.deepEqual(P.pickerAction("t", { at: 1, count: 3 }), { do: "place", where: "top" });
+  assert.deepEqual(P.pickerAction("r", { at: 1, count: 3 }), { do: "place", where: "right" });
+  assert.deepEqual(P.pickerAction("l", { at: 1, count: 3 }), { do: "place", where: "left" });
+  assert.deepEqual(P.pickerAction("n", { at: 1, count: 3 }), { do: "add" });
+  assert.deepEqual(P.pickerAction("x", { at: 1, count: 3 }), { do: "remove" });
+  assert.deepEqual(P.pickerAction("escape", { at: 1, count: 3 }), { do: "close" });
+  // A chord with a modifier is someone else's key.
+  assert.equal(P.pickerAction("cmd-m", { at: 1, count: 3 }), null);
+  assert.equal(P.pickerAction("shift-b", { at: 1, count: 3 }), null);
+  assert.equal(P.pickerAction("q", { at: 1, count: 3 }), null);
+  assert.equal(P.pickerAction("down", { at: 0, count: 0 }), null);
+});
+
+test("starterFromText: the first word (without its path) names it, whitespace splits it", () => {
+  assert.deepEqual(P.starterFromText("  htop  "), { label: "htop", argv: ["htop"] });
+  assert.deepEqual(P.starterFromText("/opt/homebrew/bin/btop --utf-force"), { label: "btop", argv: ["/opt/homebrew/bin/btop", "--utf-force"] });
+  assert.deepEqual(P.starterFromText("npm  run\tdev"), { label: "npm", argv: ["npm", "run", "dev"] });
+  assert.equal(P.starterFromText("   "), null);
+  assert.equal(P.starterFromText(undefined), null);
+});
+
+test("addStarter / removeStarter: the defaults when unset, no duplicate commands, remove by value", () => {
+  assert.deepEqual(P.DEFAULT_STARTERS, [{ label: "lazygit", argv: ["lazygit"] }, { label: "shell", argv: null }]);
+  const htop = { label: "htop", argv: ["htop"] };
+  const once = P.addStarter(undefined, htop);
+  assert.deepEqual(once, [...P.DEFAULT_STARTERS, htop]);
+  assert.equal(P.addStarter(once, { label: "htop", argv: ["htop"] }), once);
+  assert.deepEqual(P.addStarter([], htop), [htop]);
+  assert.deepEqual(P.removeStarter(once, { label: "lazygit", argv: ["lazygit"] }), [{ label: "shell", argv: null }, htop]);
+  assert.deepEqual(P.removeStarter(undefined, P.DEFAULT_STARTERS[1]), [P.DEFAULT_STARTERS[0]]);
+  assert.deepEqual(P.removeStarter([htop], P.DEFAULT_STARTERS[1]), [htop]);
+});

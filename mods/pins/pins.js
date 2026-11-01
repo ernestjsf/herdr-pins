@@ -114,6 +114,39 @@ export function needsRestart(pin, term) {
   return name(now?.[0]) !== name(pin.argv[0]);
 }
 
+// ---- the picker ----
+
+// What a key does in the picker (and the Move… popup, which takes the moves, Enter, b t r l and
+// Esc). `key` is the whole chord, so cmd-m is not m. Null: not the picker's key.
+const PICKER_KEYS = {
+  enter: { do: "pin", scope: "space" }, m: { do: "pin", scope: "machine" }, a: { do: "pin", scope: "all" },
+  u: { do: "unpin" }, g: { do: "go" }, n: { do: "add" }, x: { do: "remove" }, escape: { do: "close" },
+  b: { do: "place", where: "bottom" }, t: { do: "place", where: "top" }, r: { do: "place", where: "right" }, l: { do: "place", where: "left" },
+};
+export function pickerAction(key, { at = 0, count = 0 } = {}) {
+  if (key === "down" || key === "up") return count ? { do: "move", at: (at + (key === "down" ? 1 : count - 1)) % count } : null;
+  return PICKER_KEYS[key] ?? null;
+}
+
+// The picker's Start rows, kept in shared "pins.starters"; these while it is unset.
+export const DEFAULT_STARTERS = [{ label: "lazygit", argv: ["lazygit"] }, { label: "shell", argv: null }];
+
+// A starter from what someone typed: split on whitespace (no quoting), named after the first
+// word without its path. Null for nothing.
+export function starterFromText(text) {
+  const argv = String(text ?? "").trim().split(/\s+/).filter(Boolean);
+  return argv.length ? { label: argv[0].split("/").pop(), argv } : null;
+}
+
+const sameStarter = (a, b) => JSON.stringify(a.argv) === JSON.stringify(b.argv);
+export function addStarter(list, starter) {
+  const now = list ?? DEFAULT_STARTERS;
+  return now.some((s) => sameStarter(s, starter)) ? now : [...now, starter];
+}
+export function removeStarter(list, starter) {
+  return (list ?? DEFAULT_STARTERS).filter((s) => !sameStarter(s, starter));
+}
+
 // ---- setup.mjs: putting the pins column into a personal layout ----
 
 // Herdr rewrites these on every start, so they can't hold the column.
@@ -192,4 +225,12 @@ export function insertPinsColumn(tree, { height = 360, place = "bottom" } = {}) 
   if (hasId(tree, "pins")) return tree;
   if (!tree.children) return null;
   return movePinsColumn({ ...tree, children: [...tree.children, pinsColumn(height)] }, place);
+}
+
+// keys.json with `chord` bound to `command` in `section` (made when missing), everything else as
+// it was. Null when the chord is bound in any section: setup never changes someone's key.
+// ceiling: exact spelling only (cmd-shift-] and cmd-} are the same key to Herdr); upgrade: if a duplicate slips through.
+export function addKey(keys, section, chord, command) {
+  if (Object.values(keys ?? {}).some((s) => s && typeof s === "object" && chord in s)) return null;
+  return { ...keys, [section]: { ...keys?.[section], [chord]: command } };
 }

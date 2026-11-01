@@ -119,3 +119,18 @@ test("insertPinsColumn: place puts the column right, left, top or bottom", () =>
     assert.deepEqual(out, P.movePinsColumn(placed, where));
   }
 });
+
+test("addKey: adds the chord to the section, keeps everything else", () => {
+  const keys = { global: { "cmd-t": "tab.new" }, terminal: { "alt-left": "send:\u001bb" }, "layout:my-main": { "cmd-g": "tabs-graph.graph" } };
+  const before = structuredClone(keys);
+  const out = P.addKey(keys, "layout:my-main", "cmd-alt-o", "pins.pick");
+  assert.deepEqual(out, { ...before, "layout:my-main": { "cmd-g": "tabs-graph.graph", "cmd-alt-o": "pins.pick" } });
+  assert.deepEqual(keys, before);
+  assert.deepEqual(P.addKey({}, "layout:my-x", "cmd-alt-o", "pins.pick"), { "layout:my-x": { "cmd-alt-o": "pins.pick" } });
+});
+
+test("addKey: null when the chord is bound in any section", () => {
+  const keys = { global: { "cmd-alt-o": "app.palette" }, "layout:my-main": {} };
+  assert.equal(P.addKey(keys, "layout:my-main", "cmd-alt-o", "pins.pick"), null);
+  assert.equal(P.addKey({ "layout:other": { "cmd-alt-o": "pins.pick" } }, "layout:my-main", "cmd-alt-o", "pins.pick"), null);
+});
