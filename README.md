@@ -13,10 +13,11 @@ tabs always shows git for the repo you are in.
 - A column under your tabs (or anywhere in your layout) with a 28px header and a terminal.
 - The header shows the pinned terminal's program, its folder, and where it is pinned: `this space`, `this machine` or `everywhere`. Click it to focus the terminal.
 - A space pin beats a machine pin, which beats an everywhere pin. With nothing pinned the column folds to its header, which says `Nothing pinned here`.
-- Hover the header for **Pin…**, **Move…** and **Unpin**. Pin… opens a list: **Start lazygit here**, **Start a shell here**, then the terminals in this space's tabs. Each row has three buttons: **Space**, **Machine**, **All**.
-- Pinning a terminal from a tab that has other panes moves it: its pane leaves the tab and the terminal shows in the pins column only. Unpin gives it a new tab in the current space. A terminal that is its tab's only pane stays where it is (moving it would close the tab).
+- Hover the header for **Pin…**, **Move…** and **Unpin**, or press your Pin… key. Pin… opens a list in two parts. **Start new**: **Start lazygit here**, **Start a shell here**, your own [starters](#starters), and **Add a command…**. **Pin an open terminal**: **Pin this pane** (the terminal you were in), then the other terminals in this space's tabs, each with its tab's name and address (`2 · Claude Code … t65`). Each row has three buttons: **Space**, **Machine**, **All**.
+- The list works from the keyboard: ↑/↓ choose, Enter pins to this space, **m** to this machine, **a** everywhere, **u** unpins, **g** goes to the pinned terminal, **b t r l** move the column, **n** adds a command, **x** removes a starter, Esc closes. The footer lists them.
+- Pinning a terminal moves it: its pane leaves the tab and the terminal shows in the pins column only. Its tab closes if the pane was alone; the space keeps a new shell tab if that was its last tab. Unpin gives it a new tab in the current space.
 - **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the folded column is a 28px strip with the pin icon; click it for Pin….
-- Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only a Start or Restart click starts a program.
+- Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only choosing a Start row or clicking Restart starts a program.
 - Pinning again to the same space (or machine, or everywhere) replaces the earlier pin there.
 - A pinned terminal that has ended shows as `t7 has ended` with Unpin. Pins are never deleted on their own.
 - After a core restart a kept program comes back as a plain shell. The header then offers **Restart**, which types the program's command into that shell.
@@ -36,7 +37,8 @@ the tab area of that personal layout (the original is saved as
 `<name>.json.before-pins`), and switches the window to it. Run it again and it says
 `already set up`; after a `git pull`, run it again to update the copy. Options: `--layout <name>`, `--height <px>` (default 360; the width
 on the right or left), `--place bottom|top|right|left` (default bottom),
-`--dry-run` (print the plan, write nothing).
+`--key <chord>` (bind that key to Pin… for this layout; see Keys), `--dry-run` (print the plan,
+write nothing).
 
 ## By hand, or somewhere else
 
@@ -66,24 +68,25 @@ it folds (`column`, default `pins`).
 
 ## Keys
 
-None by default. To add some, merge this into `~/.config/herdr-app/keys.json`, with
-your layout's name:
+Shortcuts are yours: they live in `~/.config/herdr-app/keys.json`, never in the mod. One
+key is all it needs, since Pin… does everything from the keyboard. `node setup.mjs --key
+cmd-alt-o` adds it for your layout (only if that chord is free anywhere in the file; nothing
+else changes), or merge it by hand, with your layout's name:
 
 ```json
 {
   "layout:my-layout": {
-    "cmd-alt-p": "pins.pin",
-    "cmd-alt-u": "pins.unpin",
-    "cmd-alt-o": "pins.pick",
-    "cmd-alt-m": "pins.move",
-    "cmd-alt-g": "pins.focus"
+    "cmd-alt-o": "pins.pick"
   }
 }
 ```
 
+The other commands are there for anyone who wants direct keys; bind any of them the same way:
+
+- `pins.pick` opens the Pin… list for this space.
 - `pins.pin` pins the focused terminal to this space.
 - `pins.unpin` removes the pin shown for this space.
-- `pins.pick` opens the Pin… list for this space.
+- `pins.add` opens Add a command (a new [starter](#starters)).
 - `pins.move` opens the Move list; `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there directly.
 - `pins.focus` focuses the pinned terminal. Its header shows an accent line while it has focus, since Herdr draws no focus border on a layout terminal block.
 
@@ -91,10 +94,23 @@ Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
 drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
 folds to its 28 px header on its own.
 
+## Starters
+
+The **Start new** rows are starters: commands the list can start in the space's current
+folder and pin in one go. They live in Herdr's shared state under `pins.starters`, as
+`[{ "label": "lazygit", "argv": ["lazygit"] }, { "label": "shell", "argv": null }]` (those two
+until you change the list).
+
+- Add one: **Add a command…** (or **n**, or `pins.add`), type the command, Enter. It is split
+  on spaces (no quoting) and named after its first word without its path:
+  `npm run dev` becomes **Start npm here**. The list opens again with it.
+- Remove one: highlight it and press **x**, or click the × that shows on it. The two
+  defaults can be removed too.
+
 ## lazygit in every repo
 
-1. Open the repo's space and hover the pins header.
-2. Pin… → **Start lazygit here** → **Space**.
+1. Open the repo's space and press your Pin… key (or hover the pins header, Pin…).
+2. **Start lazygit here** → Enter (or **Space**).
 3. Do the same in each repo's space. Spaces without a pin fold the column, or show
    an everywhere pin if you made one (a shell in `~` pinned to **All** is handy).
 
@@ -117,7 +133,10 @@ Moving the column is a structural edit: the mod rewrites the whole layout file a
 so a hand-formatted layout loses its formatting. The fold and sizes follow the ids.
 
 Moving a pane into the column is Herdr's `terminal.park` (the pane goes, the
-terminal keeps running) then `hc keep` again, since park turns core keep off.
+terminal keeps running) then `hc keep` again, since park turns core keep off. Parking a
+space's last pane would close the space, so the mod first opens a shell tab there
+(`tab.new`, in the space's live folder) and parks only once it shows (within 2 s; else the
+pane stays and a toast says so).
 
 Pins live in Herdr's shared state under `pins.list`. The column opens at the
 `size.px` in your layout file: raise it there. lazygit wants about 360 px.

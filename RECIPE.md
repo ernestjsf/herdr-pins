@@ -44,26 +44,43 @@ it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
 **The Move… popup** is 160 × 130 at the pointer, on `popover`, 5px padding,
 12.8px type: four 30px rows, **Bottom**, **Top**, **Right**, **Left**, each a 13px
 Lucide panel icon in `muted` and the label in `foreground`, radius 7, `hover` under
-the pointer. Esc closes it.
+the pointer. ↑/↓ move a `hover` highlight (Bottom first), Enter moves the column there,
+**b t r l** move it directly, Esc closes it.
 
-**The picker** is a 440px popup at the pointer, its height 48 + 30 per row
-(at most 440), on `popover`, 5px padding, 12.8px type:
+**The picker** is a 480px popup at the pointer (a centered dialog from a key), its
+height 122 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
 
 - A 28px title line, 8px left padding, 11px `dim`: `Pin in <space name>: for this
   space, this machine, or all` (`Starting…` while a Start runs), and a close
   button (x icon, 12px, radius 4, `hover` under the pointer).
-- Rows, 30px, 8px side padding, 8px gaps, radius 7, `hover` under the pointer,
-  scrolling past the popup's height:
-  - **Start lazygit here** and **Start a shell here**, each with a 13px play icon
-    in `muted`, then the space's current folder at 11px `dim`;
-  - then one row per terminal pane in the space's tabs (`panes()` with a
-    `terminal`, in that order): its program icon at 14px (an empty 14px slot
-    when none), its name as the pane header names it (an agent's or shell's
-    program name, else the title, else the program's name, else `shell`), at
-    most 150px, in `foreground`, and its live folder at 11px `dim`.
-  - At the right of every row three buttons: **Space**, **Machine**, **All**:
-    20px tall, 6px side padding, radius 5, 1px `border`, 11px `muted`;
-    `selected` behind and `foreground` text under the pointer.
+- Two sections, each under a 24px heading (11px semibold `dim`, 8px left padding),
+  scrolling past the popup's height. Rows are 30px, 8px side padding, 8px gaps,
+  radius 7, `hover` behind the highlighted row and under the pointer:
+  - **Start new**: one row per starter (shared `pins.starters`, else lazygit and
+    shell): `Start <label> here` (`Start a shell here` when `argv` is null), a 13px
+    play icon in `muted`, then the space's current folder at 11px `dim`. The
+    highlighted or hovered starter shows a × (11px x icon, `dim`, radius 4) before
+    the scope buttons. Then **Add a command…** with a 13px plus icon, no folder and no
+    scope buttons.
+  - **Pin an open terminal**: **Pin this pane · <tab> · <name>** for the terminal
+    focused when the picker opened (passed in its props, since the popup takes the
+    keyboard), unless it is the one pinned here; then one row per other terminal
+    pane in the space's tabs (`panes()` with a `terminal`, in that order),
+    `<tab name> · <name>`: its program icon at 14px (an empty 14px slot when none),
+    the name as the pane header names it (an agent's or shell's program name, else
+    the title, else the program's name, else `shell`), at most 170px (230px for Pin
+    this pane), in `foreground`, its live folder at 11px `dim`, and its address
+    (`t65`) at 11px `dim` at the end.
+  - At the right of every row but Add a command… three buttons: **Space**,
+    **Machine**, **All**: 20px tall, 6px side padding, radius 5, 1px `border`, 11px
+    `muted`; `selected` behind and `foreground` text under the pointer.
+- A 36px footer, 1px `border` above, 11px `dim`, two lines: `↑↓ choose · ⏎ space ·
+  m machine · a all · u unpin · g go` and `b t r l move · n new · x remove · esc`.
+
+**Add a command** is a 420 × 214 dialog on `popover`, 18px padding, drawn like
+Herdr's prompt: the title, `Esc` at 11px `dim`, a `Command` label, a 36px input
+(accent border while focused), the hint `Starts in the space's folder, split on spaces:
+htop, npm run dev`, then **Cancel** and **Add**.
 
 
 ## How it behaves
@@ -117,11 +134,14 @@ props: { picker: true, space } })`); Unpin removes the matched pin (by value)
 from the list. Neither ends any terminal.
 
 **Moving a pane in**: storing a pin (a picker row for a terminal, or the `pin` key)
-first looks for the terminal's pane. When its tab has other panes, the pin is stored
-with `moved: true` and the pane goes: `run("terminal.park", {terminal})`, then the
+first looks for the terminal's pane. A terminal with a pane always moves; the pin is
+stored with `moved: true` and the pane goes (a lone pane's tab closes with it). When
+the pane is the only pane of its space's only tab, parking it would close the space:
+first `run("tab.new", { space, folder: place(space) })`, then poll `spaces()` every
+100 ms for up to 2 s until the space has two tabs. If it never does, the pin is stored
+without `moved`, the pane stays, and a toast says `The pane stays in its tab`. Then: `run("terminal.park", {terminal})`, then the
 mod polls `hc get` (300 ms, at most 3 s) until `keep` is false (park applied) and
-runs `hc keep <address>` (a `machine/t9` address works as is). A tab's only pane is
-not parked: park closes the tab, and the last tab closes the space. A pin for a
+runs `hc keep <address>` (a `machine/t9` address works as is). A pin for a
 terminal that another pin already moved is `moved` too. When a pin goes (Unpin, or
 replaced by a pin for the same scope and target) and it was `moved` and no pin left
 shows that terminal, the terminal gets a pane again if it is live:
@@ -147,31 +167,51 @@ pin has an `argv` and the live terminal's `foreground.argv[0]` (else `argv[0]`)
 differs from it by file name (`/opt/homebrew/bin/lazygit` matches `lazygit`), the
 header offers Restart, which runs `hc send <terminal> <argv joined by spaces>`.
 
+**The picker's keys** (`on_key_down` on its focus handle, focused in `init`; the
+whole chord, `e.keystroke`, so cmd-m is not m), as `pickerAction(keystroke, { at,
+count })` in `pins.js` decides: ↑/↓ move the highlight over the rows (wrapping; the
+headings are not rows), Enter pins the highlighted row to this space, **m** to this
+machine, **a** everywhere, **u** unpins the current match, **g** closes and focuses the
+pinned terminal, **b t r l** move the column and close, **n** opens Add a command,
+**x** removes the highlighted starter, Esc closes. On Add a command… Enter opens the
+dialog and the scope keys do nothing. The highlight starts on Pin this pane, else the
+first row. A click on a row is Enter on it; a scope button or × is that key on its row.
+
+**Starters**: `pins.starters` is `[{ label, argv }]`. Add a command splits the text on
+whitespace (no quoting) into `argv` and names it after the first word without its path
+(`starterFromText`); `addStarter` appends it unless a starter with the same `argv`
+is there; `removeStarter` drops the ones with that `argv`. Both start from the defaults
+when the key is unset. Enter in the dialog saves, closes it and opens the picker again
+(as a dialog) for the same space and terminal; Esc or Cancel closes it.
+
 **The picker**: a scope button pins its row. A Start row first starts the
 program in the space's current folder (its first tab pane's live folder, else
 `SpaceInfo.folder`): `hc run --bg --keep --no-parent --outlive-parent --no-notify
 --name <name> --cwd <folder> [--on <machine>] --json [-- <argv…>]`, no argv for the
-shell (hc then starts that machine's shell). The name is `pin-<program>-<folder's
+shell (hc then starts that machine's shell). The name is `pin-<starter label>-<folder's
 last part>-<4 characters of the time in base 36>`, lowercased, other characters
 as `-`, at most 32. With `--on`, core 0.1.15 prints the
 `address` already prefixed (`omarchy/t10`; older cores printed it bare):
 `startedAddress(address, machine)` adds `<machine>/` only when there is no `/`. A failed start toasts `Couldn't start it` with
 hc's error and pins nothing. The popup closes after a pick.
 
-**Keys**, through `nextCommand()` in the header copy (not the picker's):
+**Keys** are the person's, in `keys.json`; the mod binds none. The README recommends
+one, `"cmd-alt-o": "pins.pick"`, and `setup.mjs --key` adds it. Commands, through
+`nextCommand()` in the header copy (not the picker's): `pick` opens the picker;
 `pin` pins `focused().terminal` to the current space (scope space, no argv, its
 program's name as the label, moving its pane in as above); `unpin` removes the
-current match; `pick` opens the picker; `move:<where>` moves the column (a
-`pins.move:right` key delivers `move:right`). There is no hide command: Herdr's
+current match; `focus` focuses the pinned terminal; `add` opens Add a command;
+`move` opens Move…; `move:<where>` moves the column (a `pins.move:right` key
+delivers `move:right`). There is no hide command: Herdr's
 save drops hidden nodes, and the fold already shrinks the column to its header.
 
-Programs only start from a Start or Restart click.
+Programs only start from a Start row (a click or its key) or a Restart click.
 
 
 ## Setup
 
 `setup.mjs` (Node, stdlib only; `node setup.mjs [--layout <name>] [--height <px>]
-[--place bottom|top|right|left] [--dry-run]`) does the install in one step, because Herdr's `place` auto-dock does
+[--place bottom|top|right|left] [--key <chord>] [--dry-run]`) does the install in one step, because Herdr's `place` auto-dock does
 not help here: on a shipped layout it docks nothing, and on a personal one it wraps
 the whole window root in a column, spanning the sidebar. `mod.json` keeps
 `place: "none"`.
@@ -190,8 +230,16 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
    backed up to `<name>.json.before-pins` (unless that exists) and rewritten with
    `JSON.stringify(_, null, 2)`, so a hand-formatted layout loses its formatting.
 4. `layout.switch` if the window is not on that layout.
+5. Keys, also when the layout was already set up: without `--key`, one line
+   suggesting `--key cmd-alt-o` and no change. With it: stop if `keys.error` exists
+   (Herdr rejects the file already). `addKey(keys, "layout:<name>", chord,
+   "pins.pick")` returns the file with the chord added to that section, or null
+   when the chord is bound in any section (then nothing changes, and it says so).
+   It writes `JSON.stringify(_, null, 2)`, waits 1.5 s, and if `keys.error` appeared
+   writes the old text back and fails. Exact spelling only: `cmd-shift-]` and
+   `cmd-}` count as different chords.
 
-The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`, `isShipped`) are in `pins.js`, tested in
+The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`, `isShipped`, `addKey`) are in `pins.js`, tested in
 `tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`.
 `--dry-run` makes no copy, clone, write or switch.
 
@@ -200,9 +248,11 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
 
 - `mods/pins/`, `mod.json` `{ "place": "none", "title": "Pins" }`: it docks
   nowhere by itself; a layout block puts it in.
-- `main.js`: one `View` with two roles: the header (props `{ block =
-  "pins-terminal", column = "pins" }`) and the picker (`props().picker`, with
-  `space`). Helpers copied from Herdr's mods: `place(s)` from `menu`, the folder
+- `main.js`: one `View` with four roles: the header (props `{ block =
+  "pins-terminal", column = "pins" }`), the picker (`props().picker`, with `space`
+  and `terminal`), Move… (`props().mover`) and Add a command (`props().starter`,
+  with `space` and `terminal`; `InputState`/`Input` from `gpui-base` as Herdr's
+  `prompt` mod uses them: focused on open and again after 600 ms). Helpers copied from Herdr's mods: `place(s)` from `menu`, the folder
   and program-icon helpers from `pane`.
 - `pins.js`, no herdr import: `matchPin(pins, space)`, `upsertPin(pins, pin)`,
   `blockTerminal(text, blockId)`, `replaceBlockTerminal(text, blockId, address)`
@@ -210,9 +260,12 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   when the block is missing or already shows the address), `startArgs({ folder,
   machine, argv, name })`, `terminalName(what, folder, suffix)`,
   `needsRestart(pin, term)`, `startedAddress(address, machine)`, `replacedPin(pins, pin)`, `paneBack(pin, pins)`,
-  `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`. The mod
+  `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`,
+  `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
+  `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
+  section, chord, command)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
-- `icons/`: Lucide `pin`, `pin-off`, `play`, `refresh`, `x`, `move`, `panel-bottom`,
+- `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
   `LICENSE-lucide.txt`.
 - `setup.mjs` at the repo root (see Setup).
@@ -262,7 +315,9 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `hc run` arguments here, `--on` and for a shell, terminal names, Restart, the
   pin a pin replaces and when a pane comes back, and the column moved to all four
   places (round trips, the same tree when already there, null cases, every other
-  node intact).
+  node intact), the picker's key mapping, starters from text and the list's add
+  and remove, and `addKey` (adds, refuses a chord bound in any section, keeps the
+  rest).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.
@@ -277,6 +332,13 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
 - In a tab with two panes, `pins.pin` on one: it leaves the tab, the pins block
   shows it tagged `this space`, `hc get` says `keep: true`. `pins.unpin`: it is a
   tab of its own in the current space.
+- A lone pane in a space with two tabs: `pins.pin` closes its tab. The lone pane of
+  a space's only tab: the space gets a new shell tab and stays; the pane moves.
+- `herdr-app do pins.pick` shows both sections, Pin this pane highlighted, and the
+  footer; `pins.add` shows Add a command with the input focused.
+- `node setup.mjs --key cmd-alt-o` adds that one line under `layout:<name>` and
+  nothing else (`diff` the file); again, it says the chord is bound; `keys.error`
+  is absent.
 - `pins.move:right` puts the column beside the tab area; `pins.move:bottom` puts it
   back, and the layout file is as before (key order of the wrapper aside). Folded
   on the right it is a 28px strip with the pin icon.
