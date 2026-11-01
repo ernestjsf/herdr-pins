@@ -91,8 +91,8 @@ differs from what it last asked for:
   retries once. Then `layout.show` the block and resize the column to its open
   height. If the wanted address changed meanwhile, the older task stops before
   writing or showing.
-- The open height is `shared("pins.height")`, set once from the column's
-  `size.px` in the layout file (240 if missing or not above 28).
+- The open height is the column's `size.px` in the layout file, read on each
+  unfold (240 if missing or not above 28), so editing the file is the one knob.
 
 Nothing else in the file is touched: no reformatting, no reordering. The window
 reloads the edited layout by itself.

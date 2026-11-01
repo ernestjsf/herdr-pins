@@ -33,7 +33,7 @@ column and add the pins column after it:
 ```json
 { "id": "main-column", "type": "column", "gap": 8, "children": [
   { "id": "main", "type": "block", "content": { "tab": "active", "...": "as before" } },
-  { "id": "pins", "type": "column", "size": { "px": 240 }, "min": 28, "max": 700,
+  { "id": "pins", "type": "column", "size": { "px": 360 }, "min": 28, "max": 700,
     "background": "background", "radius": 10, "border": { "width": 1, "color": "border" },
     "focus": { "border": { "width": 1, "color": "accent" } },
     "children": [
@@ -91,8 +91,8 @@ Nothing else in the file changes. The window picks the edit up within a second.
 Folding uses `layout.hide` on the terminal block and `layout.resize` on the column,
 which Herdr keeps as clicks, not in your file.
 
-Pins live in Herdr's shared state under `pins.list`; the column's open height
-(read once from your layout file) under `pins.height`.
+Pins live in Herdr's shared state under `pins.list`. The column opens at the
+`size.px` in your layout file: raise it there. lazygit wants about 360 px.
 
 ## Limits
 
@@ -102,12 +102,11 @@ Pins live in Herdr's shared state under `pins.list`; the column's open height
   restart, its machine and folder (the folder Herdr gives the space, not where
   its shell is now).
 - After a core restart a kept program is a plain shell until you click Restart.
-- Terminals on another machine (`omarchy/t9`) can be pinned: the mod writes their
-  address into the layout and Herdr accepts it. Whether the block draws a remote
-  terminal is untested.
+- Terminals on another machine (`omarchy/t9`) can be pinned; the block draws them
+  like local ones.
 - Dragging the column's height is not remembered across a fold: it opens again
-  at the height from your layout file.
-- Built on Herdr 0.1.11, macOS. The swap, fold and pins were checked through the layout file and Herdr's click state; the header and picker have not been seen on screen yet.
+  at the `size.px` from your layout file.
+- Built on Herdr 0.1.11, macOS.
 
 ## Development
 

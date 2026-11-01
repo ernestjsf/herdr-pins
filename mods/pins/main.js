@@ -4,7 +4,7 @@
 // block's one address in the layout file, and folds the column to its header when
 // nothing is pinned. Props: { block: "pins-terminal", column: "pins" }.
 // With props { picker: true, space } it is the Pin… popup instead.
-// Pins live in shared "pins.list"; the column's open height in "pins.height".
+// Pins live in shared "pins.list".
 
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
@@ -15,6 +15,7 @@ const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
 const SCOPES = [["space", "Space"], ["machine", "Machine"], ["all", "All"]];
 const icon = (name) => `mods/pins/icons/${name}.svg`;
+const pickerHeight = (rows) => Math.min(440, 48 + rows * 30);
 
 function programIcon(p, size, color) {
   if (!p?.icon) return null;
@@ -75,7 +76,7 @@ export default class Pins extends View {
       const m = matchPin(pinList(), s);
       if (m) unpin(m);
     } else if (c === "pick") {
-      this.openPicker(s);
+      this.openPicker(s, "dialog");
     } else if (c === "pin") {
       const t = focused()?.terminal;
       if (!t || !s) return;
@@ -117,14 +118,11 @@ export default class Pins extends View {
     }
   }
 
-  // The column's open height: its size in the layout file, read once.
+  // The column's open height: its size in the layout file, so that is the one knob.
   async height(path) {
-    let px = shared("pins.height");
-    if (typeof px === "number") return px;
+    let px;
     try { px = findNode(JSON.parse(await readTextFile(path)), this.column)?.size?.px; } catch {}
-    px = typeof px === "number" && px > HEADER ? px : 240;
-    setShared("pins.height", px);
-    return px;
+    return typeof px === "number" && px > HEADER ? px : 240;
   }
 
   button(t, id, iconName, label, onClick) {
@@ -136,10 +134,10 @@ export default class Pins extends View {
       .child(label);
   }
 
-  openPicker(s) {
+  // From the header: a popup at the pointer. From a key: a centered dialog.
+  openPicker(s, kind = "popup") {
     if (!s) return;
-    const rows = 2 + this.paneRows(s).length;
-    openOverlay({ mod: "pins", props: { picker: true, space: s.id }, kind: "popup", width: 440, height: Math.min(440, 48 + rows * 30) });
+    openOverlay({ mod: "pins", props: { picker: true, space: s.id }, kind, width: 440, height: pickerHeight(2 + this.paneRows(s).length) });
   }
 
   render(cx) {
@@ -228,7 +226,7 @@ export default class Pins extends View {
           closeOverlay(props().overlay);
         }))
         .child(label)));
-    return v_flex().id("pins-picker").size_full().min_h(0).p(5).bg(t.popover).text_size(12.8)
+    return v_flex().id("pins-picker").w_full().h(pickerHeight(rows.length)).min_h(0).p(5).bg(t.popover).text_size(12.8)
       .child(h_flex().h(28).flex_none().pl(8).items_center().text_size(11).text_color(t.dim)
         .child(div().flex_1().truncate().child(this.busy ? "Starting…" : `Pin in ${s?.name ?? "this space"}: for this space, this machine, or all`))
         .child(div().id("pins-close").p(4).rounded(4).hover((st) => st.bg(t.hover).text_color(t.foreground))

@@ -128,7 +128,7 @@
                   "id": "pins",
                   "type": "column",
                   "size": {
-                    "px": 240
+                    "px": 360
                   },
                   "min": 60,
                   "max": 700,
