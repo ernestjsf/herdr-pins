@@ -96,3 +96,40 @@ export function needsRestart(pin, term) {
   const now = term.foreground?.argv ?? term.argv;
   return name(now?.[0]) !== name(pin.argv[0]);
 }
+
+// ---- setup.mjs: putting the pins column into a personal layout ----
+
+// Herdr rewrites these on every start, so they can't hold the column.
+const SHIPPED = ["main", "terminals", "win98"];
+export const isShipped = (name) => SHIPPED.includes(name);
+
+// The README's column: a 28px header (the mod) over the terminal block the mod rewrites.
+export function pinsColumn(height = 360) {
+  return {
+    id: "pins", type: "column", size: { px: height }, min: 28, max: 700,
+    background: "background", radius: 10, border: { width: 1, color: "border" },
+    focus: { border: { width: 1, color: "accent" } },
+    children: [
+      { id: "pins-header", type: "block", size: { px: 28 }, content: { mod: "pins", props: { block: "pins-terminal" } } },
+      { id: "pins-terminal", type: "block", content: { terminal: "" } },
+    ],
+  };
+}
+
+const hasId = (n, id) => n.id === id || (n.children ?? []).some((c) => hasId(c, id));
+
+// A copy of the layout tree with the tab area (the block showing `tab: "active"`) wrapped in a
+// column with the pins column under it. The same tree when `pins` is already there; null when
+// there is no tab block.
+export function insertPinsColumn(tree, { height = 360 } = {}) {
+  if (hasId(tree, "pins")) return tree;
+  const out = structuredClone(tree);
+  const wrap = (parent) => {
+    const kids = parent.children ?? [];
+    const at = kids.findIndex((c) => c.content?.tab === "active");
+    if (at < 0) return kids.some(wrap);
+    kids[at] = { id: "main-column", type: "column", gap: 8, children: [kids[at], pinsColumn(height)] };
+    return true;
+  };
+  return wrap(out) ? out : null;
+}
