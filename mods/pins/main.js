@@ -151,6 +151,11 @@ export default class Pins extends View {
       await storePin(cx, { terminal: t, scope: "space", space: s.id, machine: s.machine, folder: s.folder, argv: null, name: live(t)?.program?.name ?? t });
     } else if (move) {
       await moveColumn(move[1]);
+    } else if (c === "move") {
+      openOverlay({ mod: "pins", props: { mover: true }, kind: "dialog", width: 160, height: 130 });
+    } else if (c === "focus") {
+      const m = matchPin(pinList(), s);
+      if (m && live(m.terminal)) run("pane.focus", { terminal: m.terminal });
     }
   }
 
@@ -233,6 +238,8 @@ export default class Pins extends View {
         .child(svg(icon("pin")).size(13).flex_none().text_color(pin ? t.accent : t.dim));
     }
     const pic = term && programIcon(term.program, 14, t.dim);
+    // Herdr draws no focus border on a layout terminal block, so the header shows it.
+    const hasFocus = Boolean(term) && focused()?.terminal === pin.terminal && !focused()?.pane;
     return h_flex()
       .id("pins-head")
       .size_full()
@@ -240,6 +247,8 @@ export default class Pins extends View {
       .gap(8)
       .items_center()
       .bg(t.background)
+      .border_b(hasFocus ? 2 : 1)
+      .border_color(hasFocus ? t.accent : t.border)
       .text_size(12)
       .on_hover((hovered, cx) => { this.hovered = hovered; cx.notify(); })
       .on_click(() => { if (term) run("pane.focus", { terminal: pin.terminal }); })

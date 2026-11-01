@@ -75,7 +75,8 @@ your layout's name:
     "cmd-alt-p": "pins.pin",
     "cmd-alt-u": "pins.unpin",
     "cmd-alt-o": "pins.pick",
-    "cmd-alt-l": "pins.move:right"
+    "cmd-alt-m": "pins.move",
+    "cmd-alt-g": "pins.focus"
   }
 }
 ```
@@ -83,7 +84,8 @@ your layout's name:
 - `pins.pin` pins the focused terminal to this space.
 - `pins.unpin` removes the pin shown for this space.
 - `pins.pick` opens the Pin… list for this space.
-- `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there.
+- `pins.move` opens the Move list; `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there directly.
+- `pins.focus` focuses the pinned terminal. Its header shows an accent line while it has focus, since Herdr draws no focus border on a layout terminal block.
 
 Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
 drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
