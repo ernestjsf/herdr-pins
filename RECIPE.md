@@ -176,9 +176,11 @@ not help here: on a shipped layout it docks nothing, and on a personal one it wr
 the whole window root in a column, spanning the sidebar. `mod.json` keeps
 `place: "none"`.
 
-1. Home is `$HERDR_APP_HOME`, else `~/.config/herdr-app`. Symlink `mods/pins` to
-   `<home>/mods/pins` if nothing is there (another thing there is kept, with a
-   message); then `herdr-app check` must pass.
+1. Home is `$HERDR_APP_HOME`, else `~/.config/herdr-app`. Copy `mods/pins` to
+   `<home>/mods/pins` (recursive, files overwritten, Herdr's own `jsconfig.json` and
+   `gpui-kit.d.ts` kept when there): `copied`, or `updated` when a copy was there.
+   A symlink there is replaced by the copy, with a message: Herdr draws no icons
+   through it. Then `herdr-app check` must pass.
 2. Layout: `--layout`, else `shared.json`'s `layout`, else `main`. `main`, `terminals`
    and `win98` are shipped: clone with `layout.clone` as `my-<name>` (an existing one is
    used as it is) and wait up to 5 s for the file.
@@ -191,7 +193,7 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
 
 The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`, `isShipped`) are in `pins.js`, tested in
 `tests/setup.test.mjs` against `tests/fixtures/main.json`, a copy of the shipped `main`.
-`--dry-run` makes no symlink, clone, write or switch.
+`--dry-run` makes no copy, clone, write or switch.
 
 
 ## Built from
@@ -221,8 +223,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
 ## Watch out
 
 - Icons don't paint when `mods/pins` is a symlink to a folder outside
-  `~/.config/herdr-app` (as `setup.mjs` makes it); a real copy paints them. The
-  folded strip on the right or left is only an icon, so it looks empty then.
+  `~/.config/herdr-app`; a real copy paints them. Hence setup copies. Through a
+  symlink the folded strip on the right or left would look empty.
 - Herdr's own save of a layout file drops every node hidden by a click and then
   unwraps each container left with one child. Seen once on `my-main`: the hidden
   `pins-terminal` was dropped, `pins` unwrapped into `pins-header`, and the

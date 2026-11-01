@@ -29,11 +29,12 @@ Clone the repo, then from its folder:
 node setup.mjs
 ```
 
-`setup.mjs` symlinks `mods/pins` into `~/.config/herdr-app/mods/`, clones the layout
+`setup.mjs` copies `mods/pins` into `~/.config/herdr-app/mods/` (a copy, because Herdr
+draws no icons through a symlink; a symlink there is replaced), clones the layout
 you are on into `my-<name>` if it is one of Herdr's own, puts the pins column under
 the tab area of that personal layout (the original is saved as
 `<name>.json.before-pins`), and switches the window to it. Run it again and it says
-`already set up`. Options: `--layout <name>`, `--height <px>` (default 360; the width
+`already set up`; after a `git pull`, run it again to update the copy. Options: `--layout <name>`, `--height <px>` (default 360; the width
 on the right or left), `--place bottom|top|right|left` (default bottom),
 `--dry-run` (print the plan, write nothing).
 
@@ -144,9 +145,9 @@ node --test tests/
 ```
 
 Stdlib only. `tests/fixtures/layout.json` is a personal layout (a `main` clone)
-with the pins column added. Symlinking `mods/pins` into Herdr does not hot-reload
-on edits; remove and recreate the link to reload. Through the symlink Herdr
-draws none of the mod's icons (a copied folder does).
+with the pins column added. Edit in the repo, then `node setup.mjs` updates the
+installed copy and Herdr reloads it. A symlink instead of the copy draws no icons
+and, in Herdr 0.1.11, does not reload on edits either (remove and recreate the link).
 
 ## License
 

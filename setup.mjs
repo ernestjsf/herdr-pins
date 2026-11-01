@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // One-step setup: node setup.mjs [--layout <name>] [--height <px>] [--place bottom|top|right|left] [--dry-run]
 import { execFileSync } from "node:child_process";
-import { copyFileSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, constants, cpSync, existsSync, lstatSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { insertPinsColumn, isShipped } from "./mods/pins/pins.js";
 
@@ -27,17 +27,22 @@ if (!Number.isInteger(height) || height < 28 || height > 700) fail("--height mus
 
 const home = process.env.HERDR_APP_HOME || join(homedir(), ".config", "herdr-app");
 const repoMod = join(dirname(fileURLToPath(import.meta.url)), "mods", "pins");
-const modLink = join(home, "mods", "pins");
+const modDir = join(home, "mods", "pins");
 const isLink = (p) => { try { return lstatSync(p).isSymbolicLink(); } catch { return false; } };
 const note = dry ? "would " : "";
 
-// 2. the mod
-if (!existsSync(modLink) && !isLink(modLink)) {
-  say(`${note}symlink ${modLink} -> ${repoMod}`);
-  if (!dry) { mkdirSync(dirname(modLink), { recursive: true }); symlinkSync(repoMod, modLink); }
-} else if (realpathSync(modLink) === realpathSync(repoMod)) say(`mod already linked at ${modLink}`);
-else say(`${modLink} is something else; keeping it`);
-try { app("check", existsSync(modLink) ? modLink : repoMod); say("herdr-app check: ok"); }
+// 2. the mod, as a copy: Herdr draws no icons through a symlink. Run again after a pull to update it.
+// Files Herdr writes into the folder (jsconfig.json, gpui-kit.d.ts) are kept.
+const HERDR_WRITES = ["jsconfig.json", "gpui-kit.d.ts"];
+const linked = isLink(modDir);
+const update = !linked && existsSync(modDir);
+if (linked) {
+  say(`${note}replace the symlink at ${modDir} with a copy (Herdr draws no icons through a symlink)`);
+  if (!dry) unlinkSync(modDir);
+}
+if (!dry) cpSync(repoMod, modDir, { recursive: true, force: true, filter: (src, dest) => !(HERDR_WRITES.includes(basename(src)) && existsSync(dest)) });
+say(dry ? `would ${update ? "update" : "copy"} the mod at ${modDir}` : `${update ? "updated" : "copied"} the mod to ${modDir}`);
+try { app("check", dry ? repoMod : modDir); say("herdr-app check: ok"); }
 catch (e) { fail(`herdr-app check failed\n${e.stdout ?? ""}${e.stderr ?? ""}`); }
 
 // 3. the layout
