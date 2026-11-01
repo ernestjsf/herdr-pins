@@ -3,12 +3,12 @@
 
 const RANK = { space: 0, machine: 1, all: 2 };
 
-// The pin a space shows: a space pin first (by id, else by machine + folder when
-// the id is gone), then this machine's, then everywhere's; list order within each.
+// The pin a space shows: a space pin first (by the space's id only: spaces that share a folder
+// are different places), then this machine's, then everywhere's; list order within each.
 export function matchPin(pins, space) {
   if (!space) return null;
   const fits = (p) =>
-    p.scope === "space" ? p.space === space.id || (p.machine === space.machine && p.folder === space.folder)
+    p.scope === "space" ? p.space === space.id
     : p.scope === "machine" ? p.machine === space.machine
     : p.scope === "all";
   let best = null;

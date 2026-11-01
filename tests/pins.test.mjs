@@ -32,13 +32,13 @@ test("matchPin: the first in list order wins within a priority", () => {
   assert.equal(P.matchPin([a, s1, s2], here), s1);
 });
 
-test("matchPin: a space pin falls back to machine + folder when the id is gone", () => {
+test("matchPin: a space pin matches its space's id only, never another space in the same folder", () => {
+  const p = pin("space", "t3", { space: "sp1", folder: "/home/me/app" });
+  assert.equal(P.matchPin([p], here), p);
+  assert.equal(P.matchPin([p], { ...here, id: "sp9" }), null);
   const old = pin("space", "t3", { space: "sp-gone", folder: "/home/me/app" });
-  assert.equal(P.matchPin([old], here), old);
-  assert.equal(P.matchPin([old], { ...here, folder: "/home/me/other" }), null);
-  // Same folder on another machine is another place.
-  assert.equal(P.matchPin([old], remote), null);
-  const there = pin("space", "omarchy/t9", { space: "sp-gone", machine: "omarchy", folder: "/home/me/app" });
+  assert.equal(P.matchPin([old], here), null);
+  const there = pin("space", "omarchy/t9", { space: "omarchy/sp2", machine: "omarchy", folder: "/home/me/app" });
   assert.equal(P.matchPin([there], remote), there);
   assert.equal(P.matchPin([there], here), null);
 });

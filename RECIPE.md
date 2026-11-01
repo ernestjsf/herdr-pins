@@ -90,13 +90,14 @@ htop, npm run dev`, then **Cancel** and **Add**.
 "space" | "machine" | "all", space, machine, folder, argv, name }`. `terminal` is
 the address (`t7`, or `machine/t7` for another machine). `space` is the space's
 id, `machine` its machine (null for this computer), `folder` its `SpaceInfo.folder`
-(the folder Herdr gives it, not where its shell is now), recorded for every scope.
+(the folder Herdr gives it, not where its shell is now), recorded for every scope
+for display only: the match never compares it.
 `argv` is the program a Start ran (`["lazygit"]`), null for a shell or a picked
 terminal; `name` a label (`argv[0]`, else the row's name).
 
-**The match** for a space: a space pin whose `space` is the space's id, or (the
-id gone, as after a core restart might do) whose `machine` and `folder` equal the
-space's; else a machine pin whose `machine` equals the space's machine (null is
+**The match** for a space: a space pin whose `space` is the space's id (ids have held
+across app and core restarts; a folder fallback made spaces sharing a folder, such as
+several in `~`, share pins); else a machine pin whose `machine` equals the space's machine (null is
 this computer); else an everywhere pin. The first in list order wins within a
 kind. The current space is `spaces()`' entry for `focused().space` (the active
 space if that is missing).
@@ -314,16 +315,15 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
 - `layout.resize` is a click, kept in `layouts/.state/`, not in the file. The
   column's `min` must allow 29px or the fold stops at the minimum.
 - `SpaceInfo.folder` is where a space's new terminals start, which may not be
-  where its shell is now; the match's fallback compares that field, and the
-  Start rows use the live folder.
+  where its shell is now; the Start rows use the live folder.
 - A popup's tasks end when it closes: the picker awaits the start and the pin
   before closing itself.
 
 
 ## Done when
 
-- `node --test tests/` passes: the match's priorities and list order, the
-  folder fallback (and not on another machine), machine null vs a name, one pin
+- `node --test tests/` passes: the match's priorities and list order, a
+  space pin by id only (not another space in the same folder), machine null vs a name, one pin
   per scope and target, the address swap in the fixture (only that line;
   identical text when equal or missing; a mod block has none), several terminal
   blocks with the id after the content, braces and escaped quotes in strings,

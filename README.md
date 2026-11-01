@@ -149,9 +149,8 @@ Pins live in Herdr's shared state under `pins.list`. The column opens at the
 
 - The mod edits your layout file's one `terminal` value. Use a personal layout, and
   expect that value to change in version control if you keep your layouts there.
-- A space pin remembers the space's id and, in case the id changes after a core
-  restart, its machine and folder (the folder Herdr gives the space, not where
-  its shell is now).
+- A space pin belongs to that space's id. Two spaces in the same folder are two places,
+  each with its own pin; a space closed and made again is a new space.
 - After a core restart a kept program is a plain shell until you click Restart.
 - Terminals on another machine (`omarchy/t9`) can be pinned; the block draws them
   like local ones.
