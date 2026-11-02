@@ -49,12 +49,12 @@ the pointer. ↑/↓ move a `hover` highlight (Bottom first), Enter moves the co
 **b t r l** move it directly, Esc closes it.
 
 **The picker** is a 480px popup at the pointer (a centered dialog from a key), its
-height 122 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
+height 146 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
 
 - A 28px title line, 8px left padding, 11px `dim`: `Pin in <space name>: for this
   space, this machine, or all` (`Starting…` while a Start runs), and a close
   button (x icon, 12px, radius 4, `hover` under the pointer).
-- Two sections, each under a 24px heading (11px semibold `dim`, 8px left padding),
+- Three sections, each under a 24px heading (11px semibold `dim`, 8px left padding),
   scrolling past the popup's height. Rows are 30px, 8px side padding, 8px gaps,
   radius 7, `hover` behind the highlighted row and under the pointer:
   - **Start new**: one row per starter (shared `pins.starters`, else lazygit and
@@ -72,7 +72,18 @@ height 122 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
     the title, else the program's name, else `shell`), at most 170px (230px for Pin
     this pane), in `foreground`, its live folder at 11px `dim`, and its address
     (`t65`) at 11px `dim` at the end.
-  - At the right of every row but Add a command… three buttons: **Space**,
+  - **Pins**: every pin in `pins.list`, as `pinRows(pins, spaces(), terminals(),
+    match)` orders and labels them: space pins in space order (a closed space's
+    after them), then machine pins, then everywhere's, list order within each. A
+    13px pin icon, `accent` for the pin showing now (the match, by value) and `dim`
+    for the rest; a tag like the header's (at most 120px): the space's name
+    (`closed space` when it is gone), the machine or `this computer`, or
+    `everywhere`; the program (the live terminal's name, else the pin's `name`, at
+    most 120px) in `foreground`; the folder (live, else the pin's) at 11px `dim`;
+    `ended` at 11px `dim` when the terminal isn't live; the address at 11px `dim`;
+    the × when highlighted or hovered. No scope buttons. With no pins, one `dim`
+    row: `No pins yet`.
+  - At the right of every Start and open-terminal row three buttons: **Space**,
     **Machine**, **All**: 20px tall, 6px side padding, radius 5, 1px `border`, 11px
     `muted`; `selected` behind and `foreground` text under the pointer.
 - A 36px footer, 1px `border` above, 11px `dim`, two lines: `↑↓ choose · ⏎ space ·
@@ -188,8 +199,10 @@ count })` in `pins.js` decides: ↑/↓ move the highlight over the rows (wrappi
 headings are not rows), Enter pins the highlighted row to this space, **m** to this
 machine, **a** everywhere, **u** unpins the current match, **g** closes and focuses the
 pinned terminal, **b t r l** move the column and close, **n** opens Add a command,
-**x** removes the highlighted starter, Esc closes. On Add a command… Enter opens the
-dialog and the scope keys do nothing. The highlight starts on Pin this pane, else the
+**x** removes the highlighted starter, or the highlighted pin (as Unpin does, giving a
+moved pane back), Esc closes. On Add a command… Enter opens the dialog and the scope keys
+do nothing. On a pin Enter closes and, for a space pin whose space is open, shows it
+(`space.select {id}`); **m** and **a** do nothing. On `No pins yet` nothing does. The highlight starts on Pin this pane, else the
 first row. A click on a row is Enter on it; a scope button or × is that key on its row.
 
 **Starters**: `pins.starters` is `[{ label, argv }]`. Add a command splits the text on
@@ -280,7 +293,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`,
   `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
-  section, chord, command)`, `repairPinsColumn(tree)`. The mod
+  section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -334,7 +347,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   and remove, `addKey` (adds, refuses a chord bound in any section, keeps the
   rest), and `repairPinsColumn` on the broken `my-main` (the column back under
   `main-row`, nothing else changed; a whole tree untouched; a lone header keeps its
-  wrapper; a surviving block moves in once).
+  wrapper; a surviving block moves in once), and the Pins rows (order, labels,
+  `ended`, the one showing, an empty list).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.

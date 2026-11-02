@@ -147,6 +147,32 @@ export function removeStarter(list, starter) {
   return (list ?? DEFAULT_STARTERS).filter((s) => !sameStarter(s, starter));
 }
 
+// The picker's Pins section: every pin, space pins in space order (a closed space's last),
+// then machine pins, then everywhere's, list order within each. Each row: the pin, where it
+// is pinned (the space's name, the machine or "this computer", "everywhere"), the program
+// (the live terminal's, else the pin's name), its folder (live, else the space's), the
+// address, whether the terminal has ended, and whether it is the pin `current` (by value).
+export function pinRows(pins, spaces, terminals, current) {
+  const order = (p) => {
+    if (p.scope !== "space") return spaces.length + RANK[p.scope]; // machine: +1, all: +2
+    const at = spaces.findIndex((s) => s.id === p.space);
+    return at < 0 ? spaces.length : at; // a closed space's pins after the open ones
+  };
+  const now = JSON.stringify(current ?? null);
+  return (pins ?? []).map((p, i) => ({ p, i })).sort((a, b) => order(a.p) - order(b.p) || a.i - b.i).map(({ p }) => {
+    const term = terminals.find((t) => t.address === p.terminal && t.state === "live");
+    return {
+      pin: p,
+      tag: p.scope === "space" ? spaces.find((s) => s.id === p.space)?.name ?? "closed space" : p.scope === "machine" ? p.machine ?? "this computer" : "everywhere",
+      name: term?.program?.name || p.name || p.terminal,
+      folder: term ? term.foreground?.cwd ?? term.cwd : p.folder,
+      address: p.terminal,
+      ended: !term,
+      showing: JSON.stringify(p) === now,
+    };
+  });
+}
+
 // ---- setup.mjs: putting the pins column into a personal layout ----
 
 // Herdr rewrites these on every start, so they can't hold the column.

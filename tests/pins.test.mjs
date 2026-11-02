@@ -212,3 +212,35 @@ test("addStarter / removeStarter: the defaults when unset, no duplicate commands
   assert.deepEqual(P.removeStarter(undefined, P.DEFAULT_STARTERS[1]), [P.DEFAULT_STARTERS[0]]);
   assert.deepEqual(P.removeStarter([htop], P.DEFAULT_STARTERS[1]), [htop]);
 });
+
+test("pinRows: space pins in space order, then machine, then all; labels, showing and ended", () => {
+  const spaces = [{ id: "sp1", name: "herdr-devices" }, { id: "sp2", name: "sportspots" }];
+  const terms = [
+    { address: "t74", state: "live", program: { name: "lazygit" }, foreground: { cwd: "/p/choosy" }, cwd: "/p" },
+    { address: "t9", state: "live", program: { name: "zsh" }, cwd: "/home" },
+    { address: "t73", state: "finished", program: { name: "zsh" }, cwd: "/x" },
+  ];
+  const all = pin("all", "t9", { name: "shell" });
+  const mach = pin("machine", "omarchy/t2", { machine: "omarchy", name: "htop", folder: "/srv" });
+  const local = pin("machine", "t9", { name: "zsh" });
+  const s2 = pin("space", "t74", { space: "sp2", name: "lazygit", folder: "/p/choosy" });
+  const s1 = pin("space", "t73", { space: "sp1", name: "zsh", folder: "/p/ai" });
+  const gone = pin("space", "t5", { space: "sp-closed", name: "vim", folder: "/q" });
+  const rows = P.pinRows([all, mach, s2, gone, local, s1], spaces, terms, s2);
+  assert.deepEqual(rows.map((r) => r.pin), [s1, s2, gone, mach, local, all]);
+  assert.deepEqual(rows.map((r) => r.tag), ["herdr-devices", "sportspots", "closed space", "omarchy", "this computer", "everywhere"]);
+  assert.deepEqual(rows.map((r) => r.name), ["zsh", "lazygit", "vim", "htop", "zsh", "zsh"]);
+  assert.deepEqual(rows.map((r) => r.folder), ["/p/ai", "/p/choosy", "/q", "/srv", "/home", "/home"]);
+  assert.deepEqual(rows.map((r) => r.ended), [true, false, true, true, false, false]);
+  assert.deepEqual(rows.map((r) => r.showing), [false, true, false, false, false, false]);
+  assert.deepEqual(rows.map((r) => r.address), ["t73", "t74", "t5", "omarchy/t2", "t9", "t9"]);
+});
+
+test("pinRows: empty or missing list, and nothing showing", () => {
+  assert.deepEqual(P.pinRows([], [], [], null), []);
+  assert.deepEqual(P.pinRows(undefined, [], [], null), []);
+  const a = pin("all", "t1");
+  assert.equal(P.pinRows([a], [], [], null)[0].showing, false);
+  // The showing pin is matched by value: shared state hands out fresh copies.
+  assert.equal(P.pinRows([a], [], [], { ...a })[0].showing, true);
+});

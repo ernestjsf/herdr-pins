@@ -10,14 +10,14 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
 const SCOPES = [["space", "Space"], ["machine", "Machine"], ["all", "All"]];
 const icon = (name) => `mods/pins/icons/${name}.svg`;
-// Title 28, two section headings 24 each, the two-line footer 36, padding 10, rows 30 each.
-const pickerHeight = (rows) => Math.min(480, 122 + rows * 30);
+// Title 28, three section headings 24 each, the two-line footer 36, padding 10, rows 30 each.
+const pickerHeight = (rows) => Math.min(480, 146 + rows * 30);
 const PLACES = [["bottom", "Bottom", "panel-bottom"], ["top", "Top", "panel-top"], ["right", "Right", "panel-right"], ["left", "Left", "panel-left"]];
 const layoutFile = () => `${appHome()}/layouts/${shared("layout")}.json`;
 
@@ -150,11 +150,13 @@ function findNode(node, id) {
 
 const starterList = () => /** @type {any[]} */ (shared("pins.starters") ?? DEFAULT_STARTERS);
 
-// The picker's rows, in two sections. Start new: the starters, then Add a command…. Pin an open
+// The picker's rows, in three sections. Start new: the starters, then Add a command…. Pin an open
 // terminal: the focused one first (when it isn't the one pinned here), then the space's other tab
-// terminals, each named by its tab ("2 · Claude Code") so two alike stay apart.
+// terminals, each named by its tab ("2 · Claude Code") so two alike stay apart. Pins: every pin
+// (see pinRows), or one "No pins yet" row.
 function pickerRows(s, terminal) {
-  const start = "Start new", open = "Pin an open terminal";
+  const start = "Start new", open = "Pin an open terminal", pinned = "Pins";
+  const pins = pinRows(pinList(), spaces(), terminals(), matchPin(pinList(), s));
   const tabName = new Map(spaces().flatMap((x) => x.tabs.map((c) => [c.id, c.name])));
   const paneRow = (p) => {
     const name = ((p.program?.agent || p.program?.shell) && p.program.name) || p.title || p.program?.name || "shell";
@@ -169,6 +171,7 @@ function pickerRows(s, terminal) {
     { section: start, add: true, label: "Add a command…" },
     ...(self ? [{ ...self, self: true, label: `Pin this pane · ${self.label}` }] : []),
     ...own,
+    ...(pins.length ? pins.map((r) => ({ section: pinned, pinned: r })) : [{ section: pinned, empty: true, label: "No pins yet" }]),
   ];
 }
 
@@ -413,7 +416,14 @@ export default class Pins extends View {
     else if (a.do === "add" || (r?.add && a.do === "pin" && a.scope === "space")) {
       closeOverlay(p.overlay);
       openStarter(p.space, p.terminal);
-    } else if (a.do === "pin" && r && !r.add) {
+    } else if (r?.pinned && a.do === "pin") {
+      // Enter on a pin: show its space (a space pin whose space is open), then close.
+      if (a.scope !== "space") return;
+      closeOverlay(p.overlay);
+      const to = r.pinned.pin;
+      if (to.scope === "space" && spaces().some((x) => x.id === to.space)) run("space.select", { id: to.space });
+    } else if (r?.pinned && a.do === "remove") unpin(r.pinned.pin);
+    else if (a.do === "pin" && r && !r.add && !r.empty) {
       cx.spawn(async (cx) => {
         await this.pick(p.space, r, a.scope, cx);
         closeOverlay(p.overlay);
@@ -440,17 +450,30 @@ export default class Pins extends View {
     this.at = Math.min(this.at, rows.length - 1);
     const choose = (i, a) => (_e, cx) => { cx.stop_propagation(); this.at = i; this.act(a, rows, cx); cx.notify(); };
     const heading = (text) => div().h(24).flex_none().px(8).flex().items_end().pb(4).text_size(11).font_semibold().text_color(t.dim).child(text);
-    const row = (r, i) => h_flex().id(`pins-row-${i}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
+    const shell = (i) => h_flex().id(`pins-row-${i}`).h(30).flex_none().px(8).gap(8).items_center().rounded(7)
       .when(i === this.at, (el) => el.bg(t.hover)).hover((st) => st.bg(t.hover))
       .on_hover((on, cx) => { if (on) this.hoverRow = i; else if (this.hoverRow === i) this.hoverRow = -1; cx.notify(); })
-      .on_click(choose(i, { do: "pin", scope: "space" }))
+      .on_click(choose(i, { do: "pin", scope: "space" }));
+    const dim = (text) => div().flex_none().text_size(11).text_color(t.dim).child(text);
+    // The × on the highlighted or hovered starter or pin.
+    const showsX = (i) => i === this.at || i === this.hoverRow;
+    const removeButton = (i) => div().id(`pins-${i}-remove`).flex_none().p(4).rounded(4)
+      .text_color(t.dim).hover((st) => st.bg(t.selected).text_color(t.foreground))
+      .on_click(choose(i, { do: "remove" })).child(svg(icon("x")).size(11));
+    const pinRow = ({ pinned: r }, i) => shell(i)
+      .child(svg(icon("pin")).size(13).flex_none().text_color(r.showing ? t.accent : t.dim))
+      .child(div().flex_none().max_w(120).truncate().px(6).h(18).flex().items_center().rounded(5).bg(t.accent + "1f").text_size(10.5).font_medium().text_color(t.accent).child(r.tag))
+      .child(div().flex_none().max_w(120).truncate().text_color(t.foreground).child(r.name))
+      .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(folder(r.folder)))
+      .when(r.ended, (el) => el.child(dim("ended")))
+      .child(dim(r.address))
+      .when(showsX(i), (el) => el.child(removeButton(i)));
+    const row = (r, i) => r.empty ? shell(i).child(div().text_color(t.dim).child(r.label)) : r.pinned ? pinRow(r, i) : shell(i)
       .child(r.terminal ? (programIcon(r.program, 14, t.muted) ?? div().w(14).flex_none()) : svg(icon(r.add ? "plus" : "play")).size(13).flex_none().text_color(t.muted))
       .child(div().flex_none().max_w(r.self ? 230 : 170).truncate().text_color(t.foreground).child(r.label))
       .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(r.add ? "" : folder(r.terminal ? r.cwd : s && place(s))))
-      .when(Boolean(r.terminal), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(r.terminal)))
-      .when(Boolean(r.starter) && (i === this.at || i === this.hoverRow), (el) => el.child(div().id(`pins-${i}-remove`).flex_none().p(4).rounded(4)
-        .text_color(t.dim).hover((st) => st.bg(t.selected).text_color(t.foreground))
-        .on_click(choose(i, { do: "remove" })).child(svg(icon("x")).size(11))))
+      .when(Boolean(r.terminal), (el) => el.child(dim(r.terminal)))
+      .when(Boolean(r.starter) && showsX(i), (el) => el.child(removeButton(i)))
       .when(!r.add, (el) => el.children(SCOPES.map(([scope, label]) => div().id(`pins-${i}-${scope}`).flex_none().h(20).px(6).flex().items_center().rounded(5)
         .border_1().border_color(t.border).text_size(11).text_color(t.muted)
         .hover((st) => st.bg(t.selected).text_color(t.foreground))
