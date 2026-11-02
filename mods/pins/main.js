@@ -14,10 +14,14 @@ import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, start
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
-const SCOPES = [["space", "Space"], ["machine", "Machine"], ["all", "All"]];
+const SCOPES = [["space", "Space", "⏎"], ["machine", "Machine", "m"], ["all", "All", "a"]];
+// The picker's footer: key caps, then what they do.
+const KEYS = [[["↑", "↓"], "choose"], [["⏎"], "space"], [["m"], "machine"], [["a"], "all"], [["u"], "unpin"], [["g"], "go"],
+  [["b", "t", "r", "l"], "move"], [["n"], "new"], [["x"], "remove"], [["esc"], "close"]];
 const icon = (name) => `mods/pins/icons/${name}.svg`;
-// Title 28, three section headings 24 each, the two-line footer 36, padding 10, rows 30 each.
-const pickerHeight = (rows) => Math.min(480, 146 + rows * 30);
+// Title 28, the order note 18, three section headings 24 each, the two-row footer 46, padding 10,
+// rows 30 each.
+const pickerHeight = (rows) => Math.min(480, 174 + rows * 30);
 const PLACES = [["bottom", "Bottom", "panel-bottom"], ["top", "Top", "panel-top"], ["right", "Right", "panel-right"], ["left", "Left", "panel-left"]];
 const layoutFile = () => `${appHome()}/layouts/${shared("layout")}.json`;
 
@@ -548,13 +552,14 @@ export default class Pins extends View {
       .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(r.add ? "" : folder(r.terminal ? r.cwd : s && place(s))))
       .when(Boolean(r.terminal), (el) => el.child(dim(r.terminal)))
       .when(Boolean(r.starter) && showsX(i), (el) => el.child(removeButton(i)))
-      .when(!r.add, (el) => el.children(SCOPES.map(([scope, label]) => div().id(`pins-${i}-${scope}`).flex_none().h(20).px(6).flex().items_center().rounded(5)
+      .when(!r.add, (el) => el.children(SCOPES.map(([scope, label, key]) => h_flex().id(`pins-${i}-${scope}`).flex_none().h(20).px(6).gap(4).items_center().rounded(5)
         .border_1().border_color(t.border).text_size(11).text_color(t.muted)
         .hover((st) => st.bg(t.selected).text_color(t.foreground))
         .on_click(choose(i, { do: "pin", scope }))
+        .child(div().text_color(t.dim).child(key))
         .child(label))));
     const body = rows.flatMap((r, i) => [...(i === 0 || rows[i - 1].section !== r.section ? [heading(r.section)] : []), row(r, i)]);
-    const hint = (text) => div().truncate().child(text);
+    const cap = (k) => div().flex_none().h(15).px(3).flex().items_center().rounded(3).border_1().border_color(t.border).text_size(10.5).text_color(t.dim).child(k);
     return v_flex().id("pins-picker").track_focus(this.handle).w_full().h(pickerHeight(rows.length)).min_h(0).p(5).bg(t.popover).text_size(12.8)
       .on_key_down((e, cx) => {
         const a = pickerAction(e.keystroke, { at: this.at, count: rows.length });
@@ -567,10 +572,10 @@ export default class Pins extends View {
         .child(div().flex_1().truncate().child(this.busy ? "Starting…" : `Pin in ${s?.name ?? "this space"}: for this space, this machine, or all`))
         .child(div().id("pins-close").p(4).rounded(4).hover((st) => st.bg(t.hover).text_color(t.foreground))
           .on_click(() => closeOverlay(props().overlay)).child(svg(icon("x")).size(12))))
+      .child(div().h(18).flex_none().pl(8).truncate().text_size(11).text_color(t.dim).child("Shows the space pin, else the machine pin, else the everywhere pin."))
       .child(v_flex().id("pins-rows").flex_1().min_h(0).overflow_y_scrollbar().children(body))
-      .child(v_flex().h(36).flex_none().px(8).pt(6).justify_center().border_t(1).border_color(t.border).text_size(11).text_color(t.dim)
-        .child(hint("↑↓ choose · ⏎ space · m machine · a all · u unpin · g go"))
-        .child(hint("b t r l move · n new · x remove · esc")));
+      .child(h_flex().h(46).flex_none().px(8).pt(6).flex_wrap().content_start().gap_x(10).gap_y(4).border_t(1).border_color(t.border).text_size(11).text_color(t.dim)
+        .children(KEYS.map(([keys, word]) => h_flex().flex_none().gap(3).items_center().children(keys.map(cap)).child(word))));
   }
 
   // The Add a command dialog: one line, Enter adds it to the Start rows and reopens the picker.

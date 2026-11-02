@@ -62,11 +62,13 @@ the pointer. ↑/↓ move a `hover` highlight (Bottom first), Enter moves the co
 **b t r l** move it directly, Esc closes it.
 
 **The picker** is a 480px popup at the pointer (a centered dialog from a key), its
-height 146 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
+height 174 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
 
 - A 28px title line, 8px left padding, 11px `dim`: `Pin in <space name>: for this
   space, this machine, or all` (`Starting…` while a Start runs), and a close
   button (x icon, 12px, radius 4, `hover` under the pointer).
+- Under it, an 18px line, 8px left padding, 11px `dim`: `Shows the space pin, else
+  the machine pin, else the everywhere pin.`
 - Three sections, each under a 24px heading (11px semibold `dim`, 8px left padding),
   scrolling past the popup's height. Rows are 30px, 8px side padding, 8px gaps,
   radius 7, `hover` behind the highlighted row and under the pointer:
@@ -96,11 +98,15 @@ height 146 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
     `ended` at 11px `dim` when the terminal isn't live; the address at 11px `dim`;
     the × when highlighted or hovered. No scope buttons. With no pins, one `dim`
     row: `No pins yet`.
-  - At the right of every Start and open-terminal row three buttons: **Space**,
-    **Machine**, **All**: 20px tall, 6px side padding, radius 5, 1px `border`, 11px
-    `muted`; `selected` behind and `foreground` text under the pointer.
-- A 36px footer, 1px `border` above, 11px `dim`, two lines: `↑↓ choose · ⏎ space ·
-  m machine · a all · u unpin · g go` and `b t r l move · n new · x remove · esc`.
+  - At the right of every Start and open-terminal row three buttons, each its key in
+    `dim` then its word, 4px apart: **⏎ Space**, **m Machine**, **a All**: 20px tall,
+    6px side padding, radius 5, 1px `border`, 11px `muted`; `selected` behind and
+    `foreground` text under the pointer.
+- A 46px footer, 1px `border` above, 8px side and 6px top padding, 11px `dim`: key
+  caps, each a chip (15px tall, 3px side padding, radius 3, 1px `border`, 10.5px
+  `dim`) followed 3px later by its word, in groups 10px apart that wrap to a second
+  row (4px between rows): [↑][↓] choose, [⏎] space, [m] machine, [a] all, [u] unpin,
+  [g] go, [b][t][r][l] move, [n] new, [x] remove, [esc] close.
 
 **Add a command** is a 420 × 214 dialog on `popover`, 18px padding, drawn like
 Herdr's prompt: the title, `Esc` at 11px `dim`, a `Command` label, a 36px input
