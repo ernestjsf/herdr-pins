@@ -84,8 +84,8 @@ height 174 + 30 per row (at most 480), on `popover`, 5px padding, 12.8px type:
     pane in the space's tabs (`panes()` with a `terminal`, in that order),
     `<tab name> · <name>`: its program icon at 14px (an empty 14px slot when none),
     the name as the pane header names it (an agent's or shell's program name, else
-    the title, else the program's name, else `shell`), at most 170px (230px for Pin
-    this pane), in `foreground`, its live folder at 11px `dim`, and its address
+    the title, else the program's name, else `shell`), the label at most
+    170px (Pin this pane too, so its scope buttons fit), in `foreground`, its live folder at 11px `dim`, and its address
     (`t65`) at 11px `dim` at the end.
   - **Pins**: every pin in `pins.list`, as `pinRows(pins, spaces(), terminals(),
     match)` orders and labels them: space pins in space order (a closed space's

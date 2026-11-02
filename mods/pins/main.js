@@ -548,7 +548,7 @@ export default class Pins extends View {
       .when(showsX(i), (el) => el.child(removeButton(i)));
     const row = (r, i) => r.empty ? shell(i).child(div().text_color(t.dim).child(r.label)) : r.pinned ? pinRow(r, i) : shell(i)
       .child(r.terminal ? (programIcon(r.program, 14, t.muted) ?? div().w(14).flex_none()) : svg(icon(r.add ? "plus" : "play")).size(13).flex_none().text_color(t.muted))
-      .child(div().flex_none().max_w(r.self ? 230 : 170).truncate().text_color(t.foreground).child(r.label))
+      .child(div().flex_none().max_w(170).truncate().text_color(t.foreground).child(r.label))
       .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(r.add ? "" : folder(r.terminal ? r.cwd : s && place(s))))
       .when(Boolean(r.terminal), (el) => el.child(dim(r.terminal)))
       .when(Boolean(r.starter) && showsX(i), (el) => el.child(removeButton(i)))
