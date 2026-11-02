@@ -8,6 +8,8 @@ it follows.
 The everyday use: lazygit pinned to each repo's space, so the pane under your
 tabs always shows git for the repo you are in.
 
+![The Pin… picker](preview.png)
+
 ## What you get
 
 - A column under your tabs (or anywhere in your layout) with a 28px header and a terminal.
