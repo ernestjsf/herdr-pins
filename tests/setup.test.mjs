@@ -202,3 +202,33 @@ test("repairPinsColumn: a block that survived elsewhere moves into the column, n
   assert.equal(find(out, "pins-terminal").content.terminal, "t9");
   assert.deepEqual(ids(find(out, "work-body")), ["main-row", "panel-body"]);
 });
+
+// fixtures/panel-unwrapped.json is my-main after Herdr's own save unwrapped the shipped `panel`
+// column, leaving `panel-body` straight in `work-body` (2 Nov 2026).
+const unwrapped = JSON.parse(readFileSync(new URL("fixtures/panel-unwrapped.json", import.meta.url), "utf8"));
+
+test("repairPanel: panel-body gets the shipped panel column back, nothing else changes", () => {
+  const before = structuredClone(unwrapped);
+  const out = P.repairPanel(unwrapped);
+  assert.deepEqual(unwrapped, before);
+  const shipped = find(main, "panel");
+  const panel = find(out, "panel");
+  assert.deepEqual({ ...panel, children: undefined }, { ...shipped, children: undefined });
+  assert.deepEqual(ids(panel), ["panel-body"]);
+  assert.deepEqual(find(out, "panel-body"), find(unwrapped, "panel-body"));
+  const work = find(out, "work-body");
+  assert.equal(work.children.indexOf(panel), find(unwrapped, "work-body").children.findIndex((c) => c.id === "panel-body"));
+  const back = structuredClone(out);
+  const w = find(back, "work-body");
+  w.children[w.children.findIndex((c) => c.id === "panel")] = find(back, "panel-body");
+  assert.deepEqual(back, unwrapped);
+});
+
+test("repairPanel: the same tree when the panel is whole or there is no panel-body", () => {
+  assert.equal(P.repairPanel(main), main);
+  assert.equal(P.repairPanel(placed), placed);
+  const once = P.repairPanel(unwrapped);
+  assert.equal(P.repairPanel(once), once);
+  const bare = { id: "root", type: "row", children: [{ id: "main", type: "block", content: { tab: "active" } }] };
+  assert.equal(P.repairPanel(bare), bare);
+});

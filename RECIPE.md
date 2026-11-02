@@ -326,7 +326,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
   section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`, `foldSizes(fold)`, `PINS_BUTTON`,
   `addPinsButton(tree)`, `draggedSize({ layoutPx, filePx, statePx })`, `sizeKey(layout,
-  row)`. The mod
+  row)`, `PANEL`, `repairPanel(tree)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -347,7 +347,13 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   0px. Each time `pins-terminal` was dropped, `pins` unwrapped into `pins-header`
   (loose in `main-row`), and the shipped `panel` column (one child) unwrapped too.
   Hence the fold never hides anything and never goes below 1px. The `panel` unwrap
-  comes from Herdr's own layout and the mod can't prevent it. The README tells
+  comes from Herdr's own layout and the mod can't prevent it, so it repairs it:
+  `repairPanel(tree)` wraps a `panel-body` whose parent isn't `panel` back in main's
+  own `{ "id": "panel", "type": "column", "hidden": true, "size": { "px": 368 },
+  "min": 280, "max": 900 }` (the same tree otherwise), run with the pins repair on
+  start, on every read for a swap (toast `Right panel repaired after a Herdr layout
+  save`) and in setup (`repaired the right panel…`); without it the tab bar's
+  Files/Changes toggle can't hide the panel. The README tells
   people not to bind `layout.toggle:pins` for the same reason.
 - Never `layout.set`. In Herdr 0.1.11 it drops nodes from the tree and then
   keeps rewriting the layout file from its memory copy until the window
@@ -384,7 +390,9 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   wrapper; a surviving block moves in once), and the Pins rows (order, labels,
   `ended`, the one showing, an empty list), the fold's sizes (sliver, header, never
   0px), and the pin button (added on insert, kept by every move, put back by the
-  repair, never twice), and which size a fold keeps (`draggedSize`, `sizeKey`).
+  repair, never twice), which size a fold keeps (`draggedSize`, `sizeKey`), and `repairPanel` on
+  `tests/fixtures/panel-unwrapped.json` (the wrapper back, nothing else changed; a whole
+  panel or no `panel-body` untouched).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.

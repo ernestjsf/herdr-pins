@@ -159,6 +159,8 @@ wants about 360 px. Switching between two spaces that both show a pin never resi
 - Terminals on another machine (`omarchy/t9`) can be pinned; the block draws them
   like local ones.
 - Move… only places the column beside the tab area. Anywhere else: edit the file.
+- Herdr's own layout save also unwraps the right panel of a layout cloned from `main`
+  (then Files/Changes can't hide it); the mod puts that wrapper back too, with a toast.
 - Folded on the right or left with nothing pinned, the strip offers Pin… only; pin
   something (or use `pins.move:<where>`) to reach Move….
 - Built on Herdr 0.1.11, macOS.

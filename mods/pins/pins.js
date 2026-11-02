@@ -324,3 +324,18 @@ export function draggedSize({ layoutPx, filePx, statePx }) {
 // Where shared "pins.size" keeps a layout's size: per layout and orientation (a height under or
 // over the tabs, a width beside them).
 export const sizeKey = (layout, row) => `${layout}:${row ? "row" : "column"}`;
+
+// Herdr's own layout save also unwraps the shipped `panel` column of a layout cloned from main
+// (it has one child), leaving `panel-body` loose, so the tab bar's Files/Changes toggle (shown or
+// hidden on id `panel`) can't hide it. A copy of the tree with `panel-body` back in main's own
+// panel column; the same tree when it is in one, or there is no panel-body.
+export const PANEL = { id: "panel", type: "column", hidden: true, size: { px: 368 }, min: 280, max: 900 };
+export function repairPanel(tree) {
+  const holder = parentOf(tree, "panel-body");
+  if (!holder || holder.id === PANEL.id) return tree;
+  const out = JSON.parse(JSON.stringify(tree));
+  const kids = parentOf(out, "panel-body").children;
+  const at = kids.findIndex((c) => c.id === "panel-body");
+  kids[at] = { ...JSON.parse(JSON.stringify(PANEL)), children: [kids[at]] };
+  return out;
+}

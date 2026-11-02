@@ -10,7 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, foldSizes, draggedSize, sizeKey, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, repairPanel, pinRows, foldSizes, draggedSize, sizeKey, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
@@ -127,19 +127,20 @@ async function moveColumn(where) {
 }
 
 // The layout file's text, with the pins column rebuilt first when Herdr's own save dropped part
-// of it (see repairPinsColumn). Null when there is no file. A refused write means another copy
+// of it (see repairPinsColumn), and main's panel column put back around panel-body (repairPanel). Null when there is no file. A refused write means another copy
 // changed the file meanwhile: read it again.
 async function readRepaired(path) {
   const text = await readTextFile(path);
   if (text == null) return null;
   let tree;
   try { tree = JSON.parse(text); } catch { return text; }
-  const fixed = repairPinsColumn(tree);
+  const fixed = repairPanel(repairPinsColumn(tree));
   if (fixed === tree) return text;
   const next = JSON.stringify(fixed, null, 2) + "\n";
   try { await writeTextFile(path, next, text); } catch { return readTextFile(path); }
   // Only a rebuilt column is news; the pin button coming back is quiet.
   if (!findNode(tree, "pins")) notify({ title: "Pins column repaired after a Herdr layout save", level: "info" });
+  if (repairPanel(tree) !== tree) notify({ title: "Right panel repaired after a Herdr layout save", level: "info" });
   return next;
 }
 
