@@ -88,7 +88,7 @@ The other commands are there for anyone who wants direct keys; bind any of them 
 - `pins.unpin` removes the pin shown for this space.
 - `pins.add` opens Add a command (a new [starter](#starters)).
 - `pins.move` opens the Move list; `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there directly.
-- `pins.focus` focuses the pinned terminal. Its header shows an accent line while it has focus, since Herdr draws no focus border on a layout terminal block.
+- `pins.focus` (and `g` in the picker) toggles: from a pane it focuses the pinned terminal, from the pinned terminal it goes back to the pane that last had focus. Herdr's own pane keys don't leave a layout terminal block, so this is the way back without the mouse. The header shows an accent line while the pinned terminal has focus, since Herdr draws no focus border on a layout terminal block.
 
 Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
 drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column

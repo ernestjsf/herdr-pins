@@ -172,9 +172,22 @@ function pickerRows(s, terminal) {
   ];
 }
 
+// Herdr's pane.go keys don't leave a layout terminal block, so "go" is a toggle: from a pane to
+// the pinned terminal, from the pinned terminal back to the pane that last had focus.
+let lastPane = null;
+function atPinned(s) {
+  const f = focused(), m = matchPin(pinList(), s);
+  return Boolean(f && m && !f.pane && f.terminal === m.terminal);
+}
+function goPinned(s, { atPin, back }) {
+  const m = matchPin(pinList(), s);
+  if (atPin) { if (back) run("pane.focus", { pane: back }); }
+  else if (m && live(m.terminal)) run("pane.focus", { terminal: m.terminal });
+}
+
 function openPicker(spaceId, terminal, kind) {
   const s = spaces().find((x) => x.id === spaceId);
-  if (s) openOverlay({ mod: "pins", props: { picker: true, space: spaceId, terminal }, kind, width: 480, height: pickerHeight(pickerRows(s, terminal).length) });
+  if (s) openOverlay({ mod: "pins", props: { picker: true, space: spaceId, terminal, atPin: atPinned(s), back: lastPane }, kind, width: 480, height: pickerHeight(pickerRows(s, terminal).length) });
 }
 
 function openStarter(spaceId, terminal) {
@@ -230,8 +243,7 @@ export default class Pins extends View {
     } else if (c === "move") {
       openOverlay({ mod: "pins", props: { mover: true }, kind: "dialog", width: 160, height: 130 });
     } else if (c === "focus") {
-      const m = matchPin(pinList(), s);
-      if (m && live(m.terminal)) run("pane.focus", { terminal: m.terminal });
+      goPinned(s, { atPin: atPinned(s), back: lastPane });
     }
   }
 
@@ -303,6 +315,7 @@ export default class Pins extends View {
     if (props()?.mover) return this.renderMover();
     const t = theme();
     const s = currentSpace();
+    if (focused()?.pane) lastPane = focused().pane;
     const pin = matchPin(pinList(), s);
     const term = pin && live(pin.terminal);
     this.sync(cx, term ? pin.terminal : null);
@@ -411,9 +424,8 @@ export default class Pins extends View {
       if (m) unpin(m);
       closeOverlay(p.overlay);
     } else if (a.do === "go") {
-      const m = matchPin(pinList(), s);
       closeOverlay(p.overlay);
-      if (m && live(m.terminal)) run("pane.focus", { terminal: m.terminal });
+      goPinned(s, { atPin: p.atPin, back: p.back });
     } else if (a.do === "place") cx.spawn(async () => {
       await moveColumn(a.where);
       closeOverlay(p.overlay);
