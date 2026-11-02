@@ -71,7 +71,8 @@ it folds (`column`, default `pins`).
 ## Keys
 
 Shortcuts are yours: they live in `~/.config/herdr-app/keys.json`, never in the mod. One
-key is all it needs, since Pin… does everything from the keyboard. `node setup.mjs --key
+key is all it needs, since Pin… does everything from the keyboard. The `keys.json` in this
+repo binds `cmd-alt-o` to Pin… in `global`, for the herdr.dev listing to merge; `node setup.mjs --key
 cmd-alt-o` adds it for your layout (only if that chord is free anywhere in the file; nothing
 else changes), or merge it by hand, with your layout's name:
 
