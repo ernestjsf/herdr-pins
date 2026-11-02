@@ -12,12 +12,12 @@ tabs always shows git for the repo you are in.
 
 - A column under your tabs (or anywhere in your layout) with a 28px header and a terminal.
 - The header shows the pinned terminal's program, its folder, and where it is pinned: `this space`, `this machine` or `everywhere`. Click it to focus the terminal.
-- A space pin beats a machine pin, which beats an everywhere pin. With nothing pinned the column folds to its header, which says `Nothing pinned here`.
+- A space pin beats a machine pin, which beats an everywhere pin. With nothing pinned the column folds to an 8px sliver with a dot; point at it and it opens to its header (`Nothing pinned here`, **Pin…**, **Move…**), and it closes again 600 ms after the pointer leaves. A pin whose terminal ended keeps the header, to say so. To keep the header instead of the sliver, set Herdr's shared `pins.fold` to `"header"` (default `"sliver"`).
 - Hover the header for **Pin…**, **Move…** and **Unpin**, or press your Pin… key. Pin… opens a list in three parts. **Start new**: **Start lazygit here**, **Start a shell here**, your own [starters](#starters), and **Add a command…**. **Pin an open terminal**: **Pin this pane** (the terminal you were in), then the other terminals in this space's tabs, each with its tab's name and address (`2 · Claude Code … t65`). Each of those rows has three buttons: **Space**, **Machine**, **All**.
 - **All your pins**: the list's last part, **Pins**, shows every pin you have, space pins first: where it is pinned (the space's name, the machine or `this computer`, `everywhere`), the program, its folder and address, `ended` when its terminal has ended. The one showing now has the green pin. Enter on a space pin goes to its space; **x** (or the × on it) removes it.
 - The list works from the keyboard: ↑/↓ choose, Enter pins to this space, **m** to this machine, **a** everywhere, **u** unpins, **g** goes to the pinned terminal, **b t r l** move the column, **n** adds a command, **x** removes a starter or a pin, Enter on a pin goes to its space, Esc closes. The footer lists them.
 - Pinning a terminal moves it: its pane leaves the tab and the terminal shows in the pins column only. Its tab closes if the pane was alone; the space keeps a new shell tab if that was its last tab. Unpin gives it a new tab in the current space.
-- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the folded column is a 29px strip with the pin icon; click it for Pin….
+- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the sliver is 8px wide and opens to a 29px strip with the pin icon; click it for Pin….
 - Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only choosing a Start row or clicking Restart starts a program.
 - Pinning again to the same space (or machine, or everywhere) replaces the earlier pin there.
 - A pinned terminal that has ended shows as `t7 has ended` with Unpin. Pins are never deleted on their own.
@@ -63,7 +63,7 @@ wrap the `main` block in a column and add the pins column after it:
 ] }
 ```
 
-Keep `"min": 28`: the mod folds the column to its 28px header and a 1px block (29px). The header's props
+Keep `"min": 8` (or less): the mod folds the column to an 8px sliver (a 7px header and a 1px block), or 29px under the pointer. With a larger `min` the fold stops there. The header's props
 name the terminal block it drives (`block`, default `pins-terminal`) and the column
 it folds (`column`, default `pins`).
 
@@ -93,7 +93,7 @@ The other commands are there for anyone who wants direct keys; bind any of them 
 
 Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
 drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
-folds to its header on its own.
+folds to a sliver on its own.
 
 ## Starters
 
@@ -125,8 +125,8 @@ file: when the space changes it reads the file, replaces the one `"terminal": "�
 value inside the `pins-terminal` block and writes it back only if the address changed
 (the write is refused if the file changed in between; it reads again and retries once).
 Nothing else in the file changes. The window picks the edit up within a second.
-Folding resizes the terminal block to 1px (the column to its header and that 1px) and
-sets its address to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is
+Folding resizes the terminal block to 1px, the header to 7px and the column to 8px (in
+a row the header fills the strip), and sets the block's address to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is
 hidden and nothing is 0px: when Herdr saves a layout itself it drops hidden and 0px
 nodes (see RECIPE.md, Watch out).
 

@@ -182,7 +182,7 @@ export const isShipped = (name) => SHIPPED.includes(name);
 // The README's column: a 28px header (the mod) over the terminal block the mod rewrites.
 export function pinsColumn(height = 360) {
   return {
-    id: "pins", type: "column", size: { px: height }, min: 28, max: 700,
+    id: "pins", type: "column", size: { px: height }, min: 8, max: 700,
     background: "background", radius: 10, border: { width: 1, color: "border" },
     focus: { border: { width: 1, color: "accent" } },
     children: [
@@ -282,4 +282,13 @@ export function repairPinsColumn(tree) {
   if (!holder) return tree; // the header is the root: nothing to rebuild around
   holder.children[holder.children.indexOf(header)] = { ...pinsColumn(), id: column, children: [header, terminal] };
   return out;
+}
+
+// The pins column's sizes with nothing pinned here, for layout.resize. A sliver (column 8px,
+// header 7px, block 1px), or the header (column 29px, header 28px, block 1px) with fold "header"
+// or while the pointer is on the sliver. In a row (right or left) the header fills the strip,
+// so all of it can be hovered. Never 0px: Herdr's own save drops a 0px node.
+export function foldSizes({ fold = "sliver", row = false, revealed = false } = {}) {
+  const sliver = fold !== "header" && !revealed;
+  return { column: { px: sliver ? 8 : 29 }, header: row ? { weight: 1 } : { px: sliver ? 7 : 28 }, block: { px: 1 } };
 }

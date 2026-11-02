@@ -33,12 +33,23 @@ it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
     side padding, 4px gap, radius 5, 12px icon and 11px label in `muted`;
     `hover` behind and `foreground` under the pointer.
 - **The terminal**, a layout block `{ "terminal": "<address>" }`, the rest of the
-  column. With nothing (live) pinned the column is 29px and the block 1px, with
-  no terminal in it (address `""`): only the header shows. It is never hidden and
-  never 0px (see Watch out).
-- **In a row** (moved right or left) the folded column is a 29px-wide strip: the
-  header is then only the pin icon, centered, and a click on it opens Pin…. Below
-  it the strip is empty (the block is 1px).
+  column. Never hidden and never 0px (see Watch out).
+- **The fold**, with nothing (live) pinned here, by `foldSizes({ fold, row,
+  revealed })`: a **sliver**, the column 8px, the header 7px (in a row: weight 1,
+  so the whole strip is the header) and the block 1px with no terminal in it
+  (address `""`). The header draws only a centered 3px `dim` dot, radius 2. The
+  pointer on it opens it at once to the **folded header**: the column 29px, the
+  header 28px (in a row: weight 1), the block 1px; the header as below
+  (`Nothing pinned here`, Pin…, Move…). 600 ms after the pointer leaves
+  (`cx.timer.after`) it closes to the sliver unless the pointer came back.
+  Shared `pins.fold` `"header"` keeps the folded header (no sliver); a pin whose
+  terminal has ended keeps it too, to show `t7 has ended` and Unpin. Unfolding
+  resizes the header to 28px, the block to weight 1 and the column to its file
+  size. The header finds its own block id as the column's child showing this mod.
+  The column's `min` in the file must be 8 or less.
+- **In a row** (moved right or left) the opened fold is a 29px-wide strip: the
+  header fills it and is only the pin icon, 8px from the top, and a click on it
+  opens Pin….
 - An empty address draws Herdr's placeholder card in the block: at 1px it does not
   show, which is why the block is resized to 1px and not only the column.
 
@@ -122,15 +133,15 @@ the header works out what the block should show: the match's address if that
 terminal is in `terminals()` with `state` `live`, else nothing. Only when that
 differs from what it last asked for:
 
-- nothing: `layout.resize` the column to 29px (the header and 1px) and the block to
-  1px, then write `""` as the block's address (as below), so no live terminal is
-  squeezed to 1px;
+- nothing: `layout.resize` the column, header and block to the fold's sizes (see
+  The fold; again whenever those change), then write `""` as the block's address
+  (as below), so no live terminal is squeezed to 1px;
 - an address: read the shown layout's file (`<appHome>/layouts/<shared("layout")>.json`),
   replace the `"terminal": "…"` value inside the object whose `"id"` is the block's
   id (whatever the key order; strings with braces or escaped quotes don't
   confuse it), and write it back with `writeTextFile(path, next, text)` only if
   it changed. A refused write (the file changed in between) reads again and
-  retries once. Then resize the block to `weight: 1` and the column to its open
+  retries once. Then resize the header to 28px, the block to `weight: 1` and the column to its open
   height. If the wanted address changed meanwhile, the older task stops before
   writing or resizing.
 - No `layout.hide`/`layout.show` (see Watch out). One exception: when `layout()`
@@ -293,7 +304,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`,
   `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
-  section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`. The mod
+  section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`, `foldSizes({ fold, row, revealed })`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -326,7 +337,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   hidden, nothing swaps until it draws again (timers and `nextCommand` still run).
 - `hc run --name` must be unique among live terminals: hence the time suffix.
 - `layout.resize` is a click, kept in `layouts/.state/`, not in the file. The
-  column's `min` must allow 29px or the fold stops at the minimum.
+  column's `min` must allow 8px or the fold stops at the minimum (`pinsColumn()`
+  writes 8).
 - `SpaceInfo.folder` is where a space's new terminals start, which may not be
   where its shell is now; the Start rows use the live folder.
 - A popup's tasks end when it closes: the picker awaits the start and the pin
@@ -348,7 +360,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   rest), and `repairPinsColumn` on the broken `my-main` (the column back under
   `main-row`, nothing else changed; a whole tree untouched; a lone header keeps its
   wrapper; a surviving block moves in once), and the Pins rows (order, labels,
-  `ended`, the one showing, an empty list).
+  `ended`, the one showing, an empty list), and the fold's sizes (sliver, header,
+  opened, in a row, never 0px).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.
@@ -372,6 +385,6 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   is absent.
 - `pins.move:right` puts the column beside the tab area; `pins.move:bottom` puts it
   back, and the layout file is as before (key order of the wrapper aside). Folded
-  on the right it is a 29px strip with the pin icon.
+  on the right it is an 8px sliver that opens to a 29px strip with the pin icon.
 - `node setup.mjs --layout terminals --place right` on a fresh clone puts the
   column right of the tab area.

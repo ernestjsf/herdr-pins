@@ -10,7 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, foldSizes, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
@@ -226,6 +226,21 @@ export default class Pins extends View {
 
   get block() { return props()?.block ?? "pins-terminal"; }
   get column() { return props()?.column ?? "pins"; }
+  // This header's own block: the column's child that shows this mod.
+  get header() { return findNode(layout(), this.column)?.children?.find((c) => c.content?.mod === "pins")?.id ?? "pins-header"; }
+
+  // The pointer on the header: a sliver opens to the folded header at once, and closes again
+  // 600 ms after the pointer leaves unless it came back.
+  hover(on, cx) {
+    this.hovered = on;
+    if (on) this.revealed = true;
+    else cx.timer.after(600, (cx) => {
+      if (this.hovered || !this.revealed) return;
+      this.revealed = false;
+      cx.notify();
+    });
+    cx.notify();
+  }
 
   async command(c, cx) {
     const s = currentSpace();
@@ -250,29 +265,34 @@ export default class Pins extends View {
     }
   }
 
-  // Show `want` in the block, or fold the column to its header (null). Runs when the match changes.
+  // Show `want` in the block, or fold the column (null) to `fold`'s sizes (see foldSizes).
   // The fold is resizes alone: Herdr's own layout save drops a node that is hidden or 0px and
-  // unwraps what is left, so the block is never hidden and never 0px. Folded, the block is 1px
-  // and the column its header plus that 1px (in a row the column is a strip and the block would
-  // fill it), with no terminal in the block: its address is "", so no live terminal is squeezed.
-  sync(cx, want) {
-    if (want === this.want) return;
-    this.want = want;
-    // An older version hid the block: show it once, or it stays hidden.
-    if (findNode(layout(), this.block)?.hidden) run("layout.show", { id: this.block });
-    if (!want) {
-      run("layout.resize", { id: this.column, px: HEADER + 1 });
-      run("layout.resize", { id: this.block, px: 1 });
+  // unwraps what is left, so nothing is ever hidden or 0px. Folded, the block shows no terminal:
+  // its address is "", so no live terminal is squeezed to 1px.
+  sync(cx, want, fold) {
+    if (want !== this.want) {
+      this.want = want;
+      this.folded = null;
+      // An older version hid the block: show it once, or it stays hidden.
+      if (findNode(layout(), this.block)?.hidden) run("layout.show", { id: this.block });
+      cx.spawn(async () => {
+        const path = layoutFile();
+        await this.write(path, want);
+        if (!want) return;
+        const px = await this.height(path);
+        if (this.want !== want) return;
+        run("layout.resize", { id: this.header, px: HEADER });
+        run("layout.resize", { id: this.block, weight: 1 });
+        run("layout.resize", { id: this.column, px });
+      });
     }
-    cx.spawn(async () => {
-      const path = layoutFile();
-      await this.write(path, want);
-      if (!want) return;
-      const px = await this.height(path);
-      if (this.want !== want) return;
-      run("layout.resize", { id: this.block, weight: 1 });
-      run("layout.resize", { id: this.column, px });
-    });
+    // Folded: resize only when the sizes change (a sliver opening under the pointer, a move).
+    const key = JSON.stringify(fold);
+    if (want || key === this.folded) return;
+    this.folded = key;
+    run("layout.resize", { id: this.column, ...fold.column });
+    run("layout.resize", { id: this.header, ...fold.header });
+    run("layout.resize", { id: this.block, ...fold.block });
   }
 
   // Swap the block's address in the layout file ("" when folded); the window follows within a
@@ -321,12 +341,22 @@ export default class Pins extends View {
     if (focused()?.pane) lastPane = focused().pane;
     const pin = matchPin(pinList(), s);
     const term = pin && live(pin.terminal);
-    this.sync(cx, term ? pin.terminal : null);
     const placed = shared("pins.place");
-    const row = placed && placed.at !== this.placedAt && placed.layout === shared("layout") ? placed.where === "right" || placed.where === "left" : this.row;
-    // Folded in a row: a 28px-wide strip, too narrow for text. The pin icon; a click opens Pin….
+    const row = placed && placed.at !== this.placedAt && placed.layout === shared("layout") ? placed.where === "right" || placed.where === "left" : Boolean(this.row);
+    // Nothing pinned here: a sliver (shared "pins.fold", default "sliver") that opens to the
+    // folded header under the pointer. A pin whose terminal ended keeps the header, to say so.
+    const fold = pin || shared("pins.fold") === "header" ? "header" : "sliver";
+    const sliver = !term && fold === "sliver" && !this.revealed;
+    this.sync(cx, term ? pin.terminal : null, foldSizes({ fold, row, revealed: this.revealed }));
+    if (sliver) {
+      return div().id("pins-head").size_full().flex().items_center().justify_center().bg(t.background)
+        .on_hover((on, cx) => this.hover(on, cx))
+        .child(div().w(3).h(3).rounded(2).bg(t.dim));
+    }
+    // Folded in a row: a 29px-wide strip, too narrow for text. The pin icon; a click opens Pin….
     if (row && !term) {
-      return h_flex().id("pins-head").size_full().justify_center().items_center().bg(t.background)
+      return h_flex().id("pins-head").size_full().justify_center().items_start().pt(8).bg(t.background)
+        .on_hover((on, cx) => this.hover(on, cx))
         .on_click(() => this.openPicker(s))
         .child(svg(icon("pin")).size(13).flex_none().text_color(pin ? t.accent : t.dim));
     }
@@ -343,7 +373,7 @@ export default class Pins extends View {
       .border_b(hasFocus ? 2 : 1)
       .border_color(hasFocus ? t.accent : t.border)
       .text_size(12)
-      .on_hover((hovered, cx) => { this.hovered = hovered; cx.notify(); })
+      .on_hover((on, cx) => this.hover(on, cx))
       .on_click(() => { if (term) run("pane.focus", { terminal: pin.terminal }); })
       .child(svg(icon("pin")).size(13).flex_none().text_color(pin ? t.accent : t.dim))
       .when(!pin, (el) => el.child(div().flex_1().truncate().text_color(t.dim).child("Nothing pinned here")))
