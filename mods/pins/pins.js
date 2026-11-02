@@ -194,6 +194,23 @@ export function pinsColumn(height = 360) {
 
 const hasId = (n, id) => n.id === id || (n.children ?? []).some((c) => hasId(c, id));
 
+// The pin button: a floating block over the tab block, bottom right, shown while nothing is
+// pinned for the space (the mod with props { button: true }).
+export const PINS_BUTTON = { id: "pins-button", content: { mod: "pins", props: { button: true } }, edge: "bottom", align: "end" };
+
+const findTabBlock = (n) => (n.content?.tab === "active" ? n : (n.children ?? []).map(findTabBlock).find(Boolean));
+
+// A copy of the tree with the pin button floating on the tab block; the same tree when it is
+// there already or there is no tab block.
+export function addPinsButton(tree) {
+  const tab = findTabBlock(tree);
+  if (!tab || (tab.floating ?? []).some((f) => f.id === PINS_BUTTON.id)) return tree;
+  const out = JSON.parse(JSON.stringify(tree));
+  const at = findTabBlock(out);
+  at.floating = [...(at.floating ?? []), JSON.parse(JSON.stringify(PINS_BUTTON))];
+  return out;
+}
+
 // The node whose children hold `id`, or null.
 export function parentOf(node, id) {
   for (const c of node.children ?? []) {
@@ -250,7 +267,8 @@ export function movePinsColumn(tree, where) {
 export function insertPinsColumn(tree, { height = 360, place = "bottom" } = {}) {
   if (hasId(tree, "pins")) return tree;
   if (!tree.children) return null;
-  return movePinsColumn({ ...tree, children: [...tree.children, pinsColumn(height)] }, place);
+  const out = movePinsColumn({ ...tree, children: [...tree.children, pinsColumn(height)] }, place);
+  return out && addPinsButton(out);
 }
 
 // keys.json with `chord` bound to `command` in `section` (made when missing), everything else as
@@ -264,15 +282,16 @@ export function addKey(keys, section, chord, command) {
 // Herdr's own layout save drops a hidden or 0px node and unwraps a container left with one
 // child: the column's terminal block goes and the header (the block showing this mod) is left
 // loose where the column was. A copy of the tree with the column rebuilt around the header, in
-// its place, at 360px (a block that survived elsewhere moves in); the same tree when the column
-// is there or there is no header. Ids come from the header's props, as the mod reads them.
+// its place, at 360px (a block that survived elsewhere moves in). The pin button comes back too
+// when it is gone (see addPinsButton). The same tree when nothing is missing or there is no
+// header. Ids come from the header's props, as the mod reads them.
 export function repairPinsColumn(tree) {
   const findHeader = (n) => (n.content?.mod === "pins" ? n : (n.children ?? []).map(findHeader).find(Boolean));
   const found = findHeader(tree);
   if (!found) return tree;
   const props = found.content.props;
   const column = props?.column ?? "pins", block = props?.block ?? "pins-terminal";
-  if (hasId(tree, column)) return tree;
+  if (hasId(tree, column)) return addPinsButton(tree);
   const out = JSON.parse(JSON.stringify(tree));
   const header = findHeader(out);
   const holderOf = (n, x) => ((n.children ?? []).includes(x) ? n : (n.children ?? []).map((c) => holderOf(c, x)).find(Boolean));
@@ -281,14 +300,13 @@ export function repairPinsColumn(tree) {
   const holder = holderOf(out, header);
   if (!holder) return tree; // the header is the root: nothing to rebuild around
   holder.children[holder.children.indexOf(header)] = { ...pinsColumn(), id: column, children: [header, terminal] };
-  return out;
+  return addPinsButton(out);
 }
 
-// The pins column's sizes with nothing pinned here, for layout.resize. A sliver (column 8px,
-// header 7px, block 1px), or the header (column 29px, header 28px, block 1px) with fold "header"
-// or while the pointer is on the sliver. In a row (right or left) the header fills the strip,
-// so all of it can be hovered. Never 0px: Herdr's own save drops a 0px node.
-export function foldSizes({ fold = "sliver", row = false, revealed = false } = {}) {
-  const sliver = fold !== "header" && !revealed;
-  return { column: { px: sliver ? 8 : 29 }, header: row ? { weight: 1 } : { px: sliver ? 7 : 28 }, block: { px: 1 } };
+// The pins column's sizes with nothing pinned here, for layout.resize: a sliver (column 8px,
+// header 7px, block 1px), or with fold "header" the header (column 29px, header 28px, block 1px).
+// Never 0px: Herdr's own save drops a 0px node.
+export function foldSizes(fold = "sliver") {
+  const sliver = fold !== "header";
+  return { column: { px: sliver ? 8 : 29 }, header: { px: sliver ? 7 : 28 }, block: { px: 1 } };
 }

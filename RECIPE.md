@@ -34,22 +34,24 @@ it in a column, 8px gap), 240px tall, `background`, radius 10, 1px `border`,
     `hover` behind and `foreground` under the pointer.
 - **The terminal**, a layout block `{ "terminal": "<address>" }`, the rest of the
   column. Never hidden and never 0px (see Watch out).
-- **The fold**, with nothing (live) pinned here, by `foldSizes({ fold, row,
-  revealed })`: a **sliver**, the column 8px, the header 7px (in a row: weight 1,
-  so the whole strip is the header) and the block 1px with no terminal in it
-  (address `""`). The header draws only a centered 3px `dim` dot, radius 2. The
-  pointer on it opens it at once to the **folded header**: the column 29px, the
-  header 28px (in a row: weight 1), the block 1px; the header as below
-  (`Nothing pinned here`, Pin…, Move…). 600 ms after the pointer leaves
-  (`cx.timer.after`) it closes to the sliver unless the pointer came back.
-  Shared `pins.fold` `"header"` keeps the folded header (no sliver); a pin whose
-  terminal has ended keeps it too, to show `t7 has ended` and Unpin. Unfolding
+- **The fold**, with nothing (live) pinned here, by `foldSizes(fold)`: a
+  **sliver**, the column 8px, the header 7px and the block 1px with no terminal in
+  it (address `""`); the header draws only its `background`. Shared `pins.fold`
+  `"header"` folds to the **header** instead: the column 29px, the header 28px,
+  the block 1px, the header as below (`Nothing pinned here`, Pin…, Move… under the
+  pointer). A pin whose terminal has ended keeps the header too, to show `t7 has
+  ended` and Unpin. Unfolding
   resizes the header to 28px, the block to weight 1 and the column to its file
   size. The header finds its own block id as the column's child showing this mod.
   The column's `min` in the file must be 8 or less.
-- **In a row** (moved right or left) the opened fold is a 29px-wide strip: the
-  header fills it and is only the pin icon, 8px from the top, and a click on it
-  opens Pin….
+- **In a row** (moved right or left) the header fold is a 29px-wide strip: the
+  header is then only the pin icon, centered, and a click on it opens Pin….
+- **The pin button**: a floating block on the tab block (`"floating": [{ "id":
+  "pins-button", "content": { "mod": "pins", "props": { "button": true } },
+  "edge": "bottom", "align": "end" }]`); Herdr draws its frame, people drag it and
+  Herdr keeps the spot. While no pin shows for the current space it is a 24px pin
+  icon (14px, `dim`, `accent` under the pointer, radius 6); a click opens Pin… as a
+  dialog. While a pin shows it renders an empty `div()`, so no frame shows.
 - An empty address draws Herdr's placeholder card in the block: at 1px it does not
   show, which is why the block is resized to 1px and not only the column.
 
@@ -179,11 +181,12 @@ Start rows never had a pane and are unchanged.
 default `pins`), the header is replaced, where it stands, by `pinsColumn()` (360px)
 with the header itself and the terminal block (`props.block`, default
 `pins-terminal`; moved in when it survived elsewhere, else `{ "terminal": "" }`). A
-wrapper the header was alone in stays. Same tree otherwise. The header runs it on
-start (the read that finds whether it is in a row) and on every read for a swap,
-before anything else: when it changed the tree it writes the file (2-space JSON, the
-expected-text check as usual; a refused write reads again) and toasts `Pins column
-repaired after a Herdr layout save`.
+wrapper the header was alone in stays. It also puts the pin button back on the tab
+block when it is gone (`addPinsButton`; never a second one). Same tree otherwise. The
+header runs it on start (the read that finds whether it is in a row) and on every read
+for a swap, before anything else: when it changed the tree it writes the file (2-space
+JSON, the expected-text check as usual; a refused write reads again) and, when the
+column itself was missing, toasts `Pins column repaired after a Herdr layout save`.
 
 **Moving the column**: `movePinsColumn(tree, where)` takes the `pins` node out (a
 `main-column`/`main-row` wrapper left with one child is replaced by it) and wraps
@@ -264,9 +267,10 @@ the whole window root in a column, spanning the sidebar. `mod.json` keeps
    and `win98` are shipped: clone with `layout.clone` as `my-<name>` (an existing one is
    used as it is) and wait up to 5 s for the file.
 3. In the personal layout's JSON: first `repairPinsColumn` (see Repair), written back
-   with `repaired the pins column…` when it changed anything. Then a node with id `pins` means done. Else the README's
+   when it changed anything, with `repaired the pins column…` (the column was
+   missing) or `added the pin button…` (an install from before the button). Then a node with id `pins` means done. Else the README's
    pins column is added and moved to `--place` (default bottom) with `movePinsColumn`:
-   `insertPinsColumn(tree, { height, place })`. No such block: fail, add it by hand. The file is
+   `insertPinsColumn(tree, { height, place })`, which also floats the pin button. No such block: fail, add it by hand. The file is
    backed up to `<name>.json.before-pins` (unless that exists) and rewritten with
    `JSON.stringify(_, null, 2)`, so a hand-formatted layout loses its formatting.
 4. `layout.switch` if the window is not on that layout.
@@ -304,7 +308,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `parentOf(node, id)`, `pinsPlace(tree)`, `movePinsColumn(tree, where)`,
   `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
-  section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`, `foldSizes({ fold, row, revealed })`. The mod
+  section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`, `foldSizes(fold)`, `PINS_BUTTON`,
+  `addPinsButton(tree)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -360,8 +365,9 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   rest), and `repairPinsColumn` on the broken `my-main` (the column back under
   `main-row`, nothing else changed; a whole tree untouched; a lone header keeps its
   wrapper; a surviving block moves in once), and the Pins rows (order, labels,
-  `ended`, the one showing, an empty list), and the fold's sizes (sliver, header,
-  opened, in a row, never 0px).
+  `ended`, the one showing, an empty list), the fold's sizes (sliver, header, never
+  0px), and the pin button (added on insert, kept by every move, put back by the
+  repair, never twice).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.
@@ -385,6 +391,9 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   is absent.
 - `pins.move:right` puts the column beside the tab area; `pins.move:bottom` puts it
   back, and the layout file is as before (key order of the wrapper aside). Folded
-  on the right it is an 8px sliver that opens to a 29px strip with the pin icon.
+  on the right it is an 8px sliver, and with `pins.fold` `"header"` a 29px strip
+  with the pin icon.
+- With nothing pinned the pin button floats at the bottom right of the tab area;
+  with a pin showing it is gone.
 - `node setup.mjs --layout terminals --place right` on a fresh clone puts the
   column right of the tab area.

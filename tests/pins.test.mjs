@@ -245,16 +245,10 @@ test("pinRows: empty or missing list, and nothing showing", () => {
   assert.equal(P.pinRows([a], [], [], { ...a })[0].showing, true);
 });
 
-test("foldSizes: a sliver by default, the header when revealed or set to header, never 0px", () => {
+test("foldSizes: a sliver by default, the header with fold \"header\", never 0px", () => {
   const sliver = { column: { px: 8 }, header: { px: 7 }, block: { px: 1 } };
-  const header = { column: { px: 29 }, header: { px: 28 }, block: { px: 1 } };
-  assert.deepEqual(P.foldSizes({}), sliver);
-  assert.deepEqual(P.foldSizes({ fold: "sliver" }), sliver);
-  assert.deepEqual(P.foldSizes({ fold: "nonsense" }), sliver);
-  assert.deepEqual(P.foldSizes({ fold: "sliver", revealed: true }), header);
-  assert.deepEqual(P.foldSizes({ fold: "header" }), header);
-  assert.deepEqual(P.foldSizes({ fold: "header", revealed: true }), header);
-  // In a row the header fills the strip, so all of it can be hovered.
-  assert.deepEqual(P.foldSizes({ row: true }), { column: { px: 8 }, header: { weight: 1 }, block: { px: 1 } });
-  assert.deepEqual(P.foldSizes({ row: true, revealed: true }), { column: { px: 29 }, header: { weight: 1 }, block: { px: 1 } });
+  assert.deepEqual(P.foldSizes(), sliver);
+  assert.deepEqual(P.foldSizes("sliver"), sliver);
+  assert.deepEqual(P.foldSizes("nonsense"), sliver);
+  assert.deepEqual(P.foldSizes("header"), { column: { px: 29 }, header: { px: 28 }, block: { px: 1 } });
 });

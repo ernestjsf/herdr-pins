@@ -5,7 +5,7 @@ import { copyFileSync, constants, cpSync, existsSync, lstatSync, readFileSync, u
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addKey, insertPinsColumn, isShipped, repairPinsColumn } from "./mods/pins/pins.js";
+import { addKey, insertPinsColumn, isShipped, parentOf, repairPinsColumn } from "./mods/pins/pins.js";
 
 const say = (s) => console.log(s);
 const fail = (s) => { console.error(`setup: ${s}`); process.exit(1); };
@@ -70,9 +70,12 @@ const source = existsSync(file(name)) ? file(name) : file(picked);
 const text = readFileSync(source, "utf8");
 const parsed = JSON.parse(text);
 // Herdr's own save can drop the column's terminal block and leave the header loose: rebuild it.
+// An install from before the pin button gets the button.
 const tree = repairPinsColumn(parsed);
 if (tree !== parsed) {
-  say(`${dry ? "would repair" : "repaired"} the pins column in ${name} (a Herdr layout save dropped its terminal block)`);
+  say(parentOf(parsed, "pins")
+    ? `${dry ? "would add" : "added"} the pin button over the tab area of ${name}`
+    : `${dry ? "would repair" : "repaired"} the pins column in ${name} (a Herdr layout save dropped its terminal block)`);
   if (!dry) writeFileSync(file(name), JSON.stringify(tree, null, 2) + "\n");
 }
 const next = insertPinsColumn(tree, { height, place });

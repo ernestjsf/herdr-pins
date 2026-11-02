@@ -23,7 +23,21 @@ test("insertPinsColumn: every other node is intact and the input is untouched", 
   assert.deepEqual(main, before);
   const body = find(out, "work-body");
   body.children[0] = find(out, "main");
+  delete body.children[0].floating;
   assert.deepEqual(out, main);
+});
+
+const BUTTON = { id: "pins-button", content: { mod: "pins", props: { button: true } }, edge: "bottom", align: "end" };
+
+test("insertPinsColumn: the pin button floats on the tab block", () => {
+  assert.deepEqual(find(P.insertPinsColumn(main), "main").floating, [BUTTON]);
+  const withOther = structuredClone(main);
+  find(withOther, "main").floating = [{ id: "board", content: { mod: "board" }, edge: "left" }];
+  assert.deepEqual(find(P.insertPinsColumn(withOther), "main").floating.map((f) => f.id), ["board", "pins-button"]);
+});
+
+test("movePinsColumn: the tab block keeps its floating pin button in every place", () => {
+  for (const where of ["top", "right", "left", "bottom"]) assert.deepEqual(find(P.movePinsColumn(placed, where), "main").floating, [BUTTON], where);
 });
 
 test("insertPinsColumn: a layout that has pins is returned as it is", () => {
@@ -152,7 +166,17 @@ test("repairPinsColumn: a loose header becomes the column again, in its place", 
   // Nothing else changed.
   const back = structuredClone(out);
   find(back, "main-row").children[1] = find(broken, "pins-header");
+  delete find(back, "main").floating;
   assert.deepEqual(back, broken);
+});
+
+test("repairPinsColumn: the pin button comes back on its own, once", () => {
+  const without = structuredClone(placed);
+  delete find(without, "main").floating;
+  const out = P.repairPinsColumn(without);
+  assert.deepEqual(out, placed);
+  assert.equal(P.repairPinsColumn(out), out);
+  assert.deepEqual(find(P.repairPinsColumn(broken), "main").floating, [BUTTON]);
 });
 
 test("repairPinsColumn: the same tree when the column is whole or there is no header", () => {
