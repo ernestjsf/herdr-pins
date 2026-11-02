@@ -144,8 +144,10 @@ pane stays and a toast says so).
 If Herdr's own layout save drops part of the column anyway, the mod puts it back the
 next time it reads the file (a toast says so), and `node setup.mjs` does the same.
 
-Pins live in Herdr's shared state under `pins.list`. The column opens at the
-`size.px` in your layout file: raise it there. lazygit wants about 360 px.
+Pins live in Herdr's shared state under `pins.list`. The column opens at the size you
+last dragged it to (kept in Herdr's shared state under `pins.size`, per layout and for
+under/over the tabs or beside them), else at the `size.px` in your layout file. lazygit
+wants about 360 px. Switching between two spaces that both show a pin never resizes it.
 
 ## Limits
 
@@ -156,8 +158,6 @@ Pins live in Herdr's shared state under `pins.list`. The column opens at the
 - After a core restart a kept program is a plain shell until you click Restart.
 - Terminals on another machine (`omarchy/t9`) can be pinned; the block draws them
   like local ones.
-- Dragging the column's height is not remembered across a fold: it opens again
-  at the `size.px` from your layout file.
 - Move… only places the column beside the tab area. Anywhere else: edit the file.
 - Folded on the right or left with nothing pinned, the strip offers Pin… only; pin
   something (or use `pins.move:<where>`) to reach Move….

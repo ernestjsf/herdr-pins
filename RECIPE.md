@@ -143,13 +143,23 @@ differs from what it last asked for:
   id (whatever the key order; strings with braces or escaped quotes don't
   confuse it), and write it back with `writeTextFile(path, next, text)` only if
   it changed. A refused write (the file changed in between) reads again and
-  retries once. Then resize the header to 28px, the block to `weight: 1` and the column to its open
-  height. If the wanted address changed meanwhile, the older task stops before
-  writing or resizing.
+  retries once. Only when this unfolds the column (the last wanted was nothing, or
+  this is the first render): resize the header to 28px, the block to `weight: 1` and
+  the column to its open size. One address for another writes the address and
+  resizes nothing, so a drag stays. If the wanted address changed meanwhile, the
+  older task stops before writing or resizing.
 - No `layout.hide`/`layout.show` (see Watch out). One exception: when `layout()`
   shows the block `hidden` (an older version folded with hide), it is shown once.
-- The open height is the column's `size.px` in the layout file, read on each
-  unfold (240 if missing or not above 28), so editing the file is the one knob.
+- The open size is the one kept in shared `pins.size` under `sizeKey(layout, row)`
+  (`my-main:column` or `my-main:row`), else the column's `size.px` in the layout
+  file, read on each unfold (240 if missing or not above 28).
+- Keeping a drag: before folding (the fold waits for it), `draggedSize({ layoutPx,
+  filePx, statePx })` takes the column's size from `layout()` when it differs from
+  the file's (it carries the drag), else from `layouts/.state/<layout>.json`
+  `nodes.pins.size.px` (read with `readTextFile`, never written), else the file's;
+  a folded size (29px or less) never counts. It is kept, or cleared when it equals
+  the file's. While open, each render also keeps a size `layout()` shows that
+  differs from the file's (compared first; no write when it is already kept).
 
 Nothing else in the file is touched by the swap: no reformatting, no reordering. The window
 reloads the edited layout by itself.
@@ -309,7 +319,8 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   `pickerAction(key, { at, count })`, `DEFAULT_STARTERS`, `starterFromText(text)`,
   `addStarter(list, starter)`, `removeStarter(list, starter)`, `addKey(keys,
   section, chord, command)`, `repairPinsColumn(tree)`, `pinRows(pins, spaces, terminals, current)`, `foldSizes(fold)`, `PINS_BUTTON`,
-  `addPinsButton(tree)`. The mod
+  `addPinsButton(tree)`, `draggedSize({ layoutPx, filePx, statePx })`, `sizeKey(layout,
+  row)`. The mod
   runtime has no `structuredClone`: copy trees with a JSON round trip.
 - `icons/`: Lucide `pin`, `pin-off`, `play`, `plus`, `refresh`, `x`, `move`, `panel-bottom`,
   `panel-top`, `panel-right`, `panel-left`, with
@@ -367,7 +378,7 @@ The pure parts (`insertPinsColumn`, `movePinsColumn`, `pinsPlace`, `pinsColumn`,
   wrapper; a surviving block moves in once), and the Pins rows (order, labels,
   `ended`, the one showing, an empty list), the fold's sizes (sliver, header, never
   0px), and the pin button (added on insert, kept by every move, put back by the
-  repair, never twice).
+  repair, never twice), and which size a fold keeps (`draggedSize`, `sizeKey`).
 - `herdr-app check ~/.config/herdr-app/mods/pins` passes and `herdr-app status`
   shows `"errors": []` on the layout with the column.
 - In a space with no pin the column is its header, `Nothing pinned here`.

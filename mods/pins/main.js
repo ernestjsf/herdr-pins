@@ -10,7 +10,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { spaces, focused, panes, terminals, layout, theme, home, appHome, props, shared, setShared, run, hc, notify, readTextFile, writeTextFile, openOverlay, closeOverlay, nextCommand } from "herdr";
-import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, foldSizes, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
+import { matchPin, upsertPin, replacedPin, paneBack, replaceBlockTerminal, startArgs, startedAddress, terminalName, needsRestart, movePinsColumn, parentOf, repairPinsColumn, pinRows, foldSizes, draggedSize, sizeKey, pickerAction, DEFAULT_STARTERS, starterFromText, addStarter, removeStarter } from "./pins.js";
 
 const HEADER = 28;
 const TAG = { space: "this space", machine: "this machine", all: "everywhere" };
@@ -260,26 +260,43 @@ export default class Pins extends View {
   // The fold is resizes alone: Herdr's own layout save drops a node that is hidden or 0px and
   // unwraps what is left, so nothing is ever hidden or 0px. Folded, the block shows no terminal:
   // its address is "", so no live terminal is squeezed to 1px.
-  sync(cx, want, fold) {
-    if (want !== this.want) {
+  // Only an unfold (from folded, or the first render) sizes the column: to the size kept for this
+  // layout and orientation (a drag, see remember), else the file's. One address for another
+  // writes the address and nothing else, so a dragged size stays.
+  sync(cx, want, fold, row) {
+    const prev = this.want;
+    if (want !== prev) {
       this.want = want;
       this.folded = null;
       // An older version hid the block: show it once, or it stays hidden.
       if (findNode(layout(), this.block)?.hidden) run("layout.show", { id: this.block });
-      cx.spawn(async () => {
+      this.remembering = !want && Boolean(prev); // keep the open size before folding
+      cx.spawn(async (cx) => {
+        if (this.remembering) {
+          await this.remember(row);
+          this.remembering = false;
+          cx.notify(); // the next render folds
+        }
         const path = layoutFile();
         await this.write(path, want);
-        if (!want) return;
-        const px = await this.height(path);
+        if (!want || prev) return;
+        const px = this.keptSize(row) ?? await this.height(path);
         if (this.want !== want) return;
         run("layout.resize", { id: this.header, px: HEADER });
         run("layout.resize", { id: this.block, weight: 1 });
         run("layout.resize", { id: this.column, px });
       });
     }
+    // Open: keep a drag when layout() shows one (cheap; no write unless it changed). Never
+    // clears: a layout() that shows only the file can't tell a drag from none.
+    if (want) {
+      const px = findNode(layout(), this.column)?.size?.px;
+      if (typeof px === "number" && px > HEADER + 1 && px !== this.filePx) this.keep(row, px, this.filePx);
+      return;
+    }
     // Folded: resize only when the sizes change (pins.fold changed, or the column was unfolded).
     const key = JSON.stringify(fold);
-    if (want || key === this.folded) return;
+    if (this.remembering || key === this.folded) return;
     this.folded = key;
     run("layout.resize", { id: this.column, ...fold.column });
     run("layout.resize", { id: this.header, ...fold.header });
@@ -301,11 +318,38 @@ export default class Pins extends View {
     }
   }
 
-  // The column's open height: its size in the layout file, so that is the one knob.
+  // The column's open size in the layout file (240 when it has none), so that is the knob for
+  // a size nobody dragged.
   async height(path) {
     let px;
     try { px = findNode(JSON.parse(await readTextFile(path)), this.column)?.size?.px; } catch {}
-    return typeof px === "number" && px > HEADER ? px : 240;
+    this.filePx = typeof px === "number" && px > HEADER ? px : 240;
+    return this.filePx;
+  }
+
+  keptSize(row) {
+    return /** @type {any} */ (shared("pins.size"))?.[sizeKey(shared("layout"), row)] ?? null;
+  }
+
+  // Keep `px` as this layout's size for this orientation in shared "pins.size". A size equal to
+  // the file's clears it, so editing the file is the knob again.
+  keep(row, px, filePx) {
+    if (!px || !filePx) return;
+    const key = sizeKey(shared("layout"), row);
+    const all = /** @type {any} */ (shared("pins.size")) ?? {};
+    const next = px === filePx ? undefined : px;
+    if (all[key] === next) return;
+    const { [key]: _, ...rest } = all;
+    setShared("pins.size", next === undefined ? rest : { ...rest, [key]: next });
+  }
+
+  // Before folding: the column's size now (a drag), from layout() or else the click state file
+  // (layouts/.state, read only, never written), kept for the next unfold.
+  async remember(row) {
+    const filePx = await this.height(layoutFile());
+    let statePx;
+    try { statePx = JSON.parse(await readTextFile(`${appHome()}/layouts/.state/${shared("layout")}.json`)).nodes?.[this.column]?.size?.px; } catch {}
+    this.keep(row, draggedSize({ layoutPx: findNode(layout(), this.column)?.size?.px, filePx, statePx }), filePx);
   }
 
   button(t, id, iconName, label, onClick) {
@@ -339,7 +383,7 @@ export default class Pins extends View {
     // the tab area instead), or with shared "pins.fold" "header" the folded header. A pin whose
     // terminal ended keeps the header, to say so.
     const fold = pin || shared("pins.fold") === "header" ? "header" : "sliver";
-    this.sync(cx, term ? pin.terminal : null, foldSizes(fold));
+    this.sync(cx, term ? pin.terminal : null, foldSizes(fold), row);
     if (!term && fold === "sliver") return div().id("pins-head").size_full().bg(t.background);
     // Folded in a row: a 29px-wide strip, too narrow for text. The pin icon; a click opens Pin….
     if (row && !term) {

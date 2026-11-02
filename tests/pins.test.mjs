@@ -252,3 +252,19 @@ test("foldSizes: a sliver by default, the header with fold \"header\", never 0px
   assert.deepEqual(P.foldSizes("nonsense"), sliver);
   assert.deepEqual(P.foldSizes("header"), { column: { px: 29 }, header: { px: 28 }, block: { px: 1 } });
 });
+
+test("draggedSize: layout() when it carries a drag, else the click state, else the file; never a fold", () => {
+  assert.equal(P.draggedSize({ layoutPx: 500, filePx: 360, statePx: 420 }), 500);
+  assert.equal(P.draggedSize({ layoutPx: 360, filePx: 360, statePx: 500 }), 500);
+  assert.equal(P.draggedSize({ layoutPx: 360, filePx: 360 }), 360);
+  assert.equal(P.draggedSize({ filePx: 360 }), 360);
+  // Folded sizes are not a drag.
+  assert.equal(P.draggedSize({ layoutPx: 8, filePx: 360, statePx: 29 }), 360);
+  assert.equal(P.draggedSize({ layoutPx: 29, filePx: 360, statePx: 8 }), 360);
+  assert.equal(P.draggedSize({}), null);
+});
+
+test("sizeKey: per layout and orientation", () => {
+  assert.equal(P.sizeKey("my-main", false), "my-main:column");
+  assert.equal(P.sizeKey("my-main", true), "my-main:row");
+});

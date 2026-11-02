@@ -310,3 +310,17 @@ export function foldSizes(fold = "sliver") {
   const sliver = fold !== "header";
   return { column: { px: sliver ? 8 : 29 }, header: { px: sliver ? 7 : 28 }, block: { px: 1 } };
 }
+
+// The column's open size now, to keep a drag across a fold: layout()'s when it differs from the
+// file's (it carries the drag), else the click state's (layouts/.state), else the file's. A
+// folded size (29px or less) is never it. Null when nothing says.
+export function draggedSize({ layoutPx, filePx, statePx }) {
+  const open = (v) => typeof v === "number" && v > 29;
+  if (open(layoutPx) && layoutPx !== filePx) return layoutPx;
+  if (open(statePx)) return statePx;
+  return open(filePx) ? filePx : null;
+}
+
+// Where shared "pins.size" keeps a layout's size: per layout and orientation (a height under or
+// over the tabs, a width beside them).
+export const sizeKey = (layout, row) => `${layout}:${row ? "row" : "column"}`;
