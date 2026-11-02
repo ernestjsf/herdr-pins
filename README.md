@@ -1,184 +1,51 @@
 # herdr-pins
 
-A pinned terminal pane for a personal layout in the [Herdr](https://herdr.dev)
-desktop app. Pin a terminal to one space, to one machine or to everywhere, and
-the pane shows the terminal pinned for the space you are in. Switch spaces and
-it follows.
-
-The everyday use: lazygit pinned to each repo's space, so the pane under your
-tabs always shows git for the repo you are in.
+A pinned terminal pane for [Herdr](https://herdr.dev). Pin a terminal to a space,
+a machine or everywhere; the pane shows the one pinned for the space you are in.
+The everyday use: lazygit in every repo's space.
 
 ![The Pin… picker](preview.png)
 
-## What you get
-
-- A column under your tabs (or anywhere in your layout) with a 28px header and a terminal.
-- The header shows the pinned terminal's program, its folder, and where it is pinned: `this space`, `this machine` or `everywhere`. Click it to focus the terminal.
-- A space pin beats a machine pin, which beats an everywhere pin. With nothing pinned the column folds to an 8px sliver. A pin whose terminal ended keeps the 28px header, to say so. To keep the header (`Nothing pinned here`, **Pin…**, **Move…**) instead of the sliver, set Herdr's shared `pins.fold` to `"header"` (default `"sliver"`).
-- A pin button floats over the main pane when nothing is pinned; drag it where you like. Click it or press your key to pin. It goes away while a pin shows.
-- Hover the header for **Pin…**, **Move…** and **Unpin**, or press your Pin… key. Pin… opens a list in three parts. **Start new**: **Start lazygit here**, **Start a shell here**, your own [starters](#starters), and **Add a command…**. **Pin an open terminal**: **Pin this pane** (the terminal you were in), then the other terminals in this space's tabs, each with its tab's name and address (`2 · Claude Code … t65`). Each of those rows has three buttons: **Space**, **Machine**, **All**.
-- **All your pins**: the list's last part, **Pins**, shows every pin you have, space pins first: where it is pinned (the space's name, the machine or `this computer`, `everywhere`), the program, its folder and address, `ended` when its terminal has ended. The one showing now has the green pin. Enter on a space pin goes to its space; **x** (or the × on it) removes it.
-- The list works from the keyboard: ↑/↓ choose, Enter pins to this space, **m** to this machine, **a** everywhere, **u** unpins, **g** goes to the pinned terminal, **b t r l** move the column, **n** adds a command, **x** removes a starter or a pin, Enter on a pin goes to its space, Esc closes. The footer shows them as key caps, and the **Space**, **Machine** and **All** buttons show their keys. A line under the title says the order: the space pin, else the machine pin, else the everywhere pin.
-- Pinning a terminal moves it: its pane leaves the tab and the terminal shows in the pins column only. Its tab closes if the pane was alone; the space keeps a new shell tab if that was its last tab. Unpin gives it a new tab in the current space.
-- **Move it**: Move… puts the column **Bottom** (under the tab area), **Top**, **Right** or **Left** of it. On the right or left the sliver is 8px wide (with `pins.fold` `"header"`, a 29px strip with the pin icon; click it for Pin…).
-- Start rows run the program as a kept terminal (`hc run --keep`) in the space's current folder. Nothing runs by itself: only choosing a Start row or clicking Restart starts a program.
-- Pinning again to the same space (or machine, or everywhere) replaces the earlier pin there.
-- A pinned terminal that has ended shows as `t7 has ended` with Unpin. Pins are never deleted on their own.
-- After a core restart a kept program comes back as a plain shell. The header then offers **Restart**, which types the program's command into that shell.
-
 ## Install
 
-Clone the repo, then from its folder:
-
 ```sh
-node setup.mjs
+git clone https://github.com/ernestjsf/herdr-pins
+cd herdr-pins
+node setup.mjs --key cmd-alt-o
 ```
 
-`setup.mjs` copies `mods/pins` into `~/.config/herdr-app/mods/` (a copy, because Herdr
-draws no icons through a symlink; a symlink there is replaced), clones the layout
-you are on into `my-<name>` if it is one of Herdr's own, puts the pins column under
-the tab area of that personal layout (the original is saved as
-`<name>.json.before-pins`), and switches the window to it. Run it again and it says
-`already set up`; after a `git pull`, run it again to update the copy. Options: `--layout <name>`, `--height <px>` (default 360; the width
-on the right or left), `--place bottom|top|right|left` (default bottom),
-`--key <chord>` (bind that key to Pin… for this layout; see Keys), `--dry-run` (print the plan,
-write nothing).
+Setup copies the mod into `~/.config/herdr-app/mods/`, clones your current
+layout to `my-<name>` if it is one of Herdr's, puts the pins column under the
+tab area and binds the key to Pin…. Options: `--layout <name>`, `--height <px>`
+(360), `--place bottom|top|right|left`, `--dry-run`. Run it again after a
+`git pull`.
 
-## By hand, or somewhere else
+## Use
 
-The column is a normal layout column and can sit anywhere in a personal layout, for
-example on the right. A personal layout is a file in `~/.config/herdr-app/layouts/`
-that you made or cloned (`herdr-app do layout.clone '{"name":"main","as":"my-layout"}'`);
-Herdr's own layouts are replaced on every start. To put the column under the tabs,
-wrap the `main` block in a column and add the pins column after it:
+- Press your key, or click the floating pin button, for **Pin…**: start lazygit
+  or a shell here, pin an open terminal, or manage your pins. Each row has
+  **Space**, **Machine** and **All**. Everything works from the keyboard; the
+  footer lists the keys.
+- A space pin beats a machine pin, which beats an everywhere pin. With nothing
+  pinned the column folds to a sliver.
+- Pinning a terminal moves it out of its tab into the column. Unpin gives it a
+  tab back.
+- Hover the header for **Pin…**, **Move…** and **Unpin**. Move… puts the column
+  under, over, left or right of the tab area.
+- **Add a command…** adds your own starter (`npm run dev`); **x** removes one.
 
-```json
-{ "id": "main-column", "type": "column", "gap": 8, "children": [
-  { "id": "main", "type": "block", "content": { "tab": "active", "...": "as before" } },
-  { "id": "pins", "type": "column", "size": { "px": 360 }, "min": 8, "max": 700,
-    "background": "background", "radius": 10, "border": { "width": 1, "color": "border" },
-    "focus": { "border": { "width": 1, "color": "accent" } },
-    "children": [
-      { "id": "pins-header", "type": "block", "size": { "px": 28 },
-        "content": { "mod": "pins", "props": { "block": "pins-terminal" } } },
-      { "id": "pins-terminal", "type": "block", "content": { "terminal": "" } }
-    ] }
-] }
-```
+Commands for your own keys: `pins.pick`, `pins.pin`, `pins.unpin`, `pins.focus`,
+`pins.add`, `pins.move`, `pins.move:<bottom|top|right|left>`.
 
-Keep `"min": 8` (or less): the mod folds the column to an 8px sliver (a 7px header and a 1px block), or 29px with `pins.fold` `"header"`. With a larger `min` the fold stops there. Setup also floats the pin button on the tab block: `"floating": [{ "id": "pins-button", "content": { "mod": "pins", "props": { "button": true } }, "edge": "bottom", "align": "end" }]`. The header's props
-name the terminal block it drives (`block`, default `pins-terminal`) and the column
-it folds (`column`, default `pins`).
+## Notes
 
-## Keys
-
-Shortcuts are yours: they live in `~/.config/herdr-app/keys.json`, never in the mod. One
-key is all it needs, since Pin… does everything from the keyboard. The `keys.json` in this
-repo binds `cmd-alt-o` to Pin… in `global`, for the herdr.dev listing to merge; `node setup.mjs --key
-cmd-alt-o` adds it for your layout (only if that chord is free anywhere in the file; nothing
-else changes), or merge it by hand, with your layout's name:
-
-```json
-{
-  "layout:my-layout": {
-    "cmd-alt-o": "pins.pick"
-  }
-}
-```
-
-The other commands are there for anyone who wants direct keys; bind any of them the same way:
-
-- `pins.pick` opens the Pin… list for this space.
-- `pins.pin` pins the focused terminal to this space.
-- `pins.unpin` removes the pin shown for this space.
-- `pins.add` opens Add a command (a new [starter](#starters)).
-- `pins.move` opens the Move list; `pins.move:bottom`, `:top`, `:right`, `:left` moves the column there directly.
-- `pins.focus` (and `g` in the picker) toggles: from a pane it focuses the pinned terminal, from the pinned terminal it goes back to the pane that last had focus. Herdr's own pane keys don't leave a layout terminal block, so this is the way back without the mouse. The header shows an accent line while the pinned terminal has focus, since Herdr draws no focus border on a layout terminal block.
-
-Don't bind Herdr's `layout.toggle:pins` to hide the column: Herdr's layout save
-drops hidden nodes (see RECIPE.md, Watch out). With nothing pinned the column
-folds to a sliver on its own.
-
-## Starters
-
-The **Start new** rows are starters: commands the list can start in the space's current
-folder and pin in one go. They live in Herdr's shared state under `pins.starters`, as
-`[{ "label": "lazygit", "argv": ["lazygit"] }, { "label": "shell", "argv": null }]` (those two
-until you change the list).
-
-- Add one: **Add a command…** (or **n**, or `pins.add`), type the command, Enter. It is split
-  on spaces (no quoting) and named after its first word without its path:
-  `npm run dev` becomes **Start npm here**. The list opens again with it.
-- Remove one: highlight it and press **x**, or click the × that shows on it. The two
-  defaults can be removed too.
-
-## lazygit in every repo
-
-1. Open the repo's space and press your Pin… key (or hover the pins header, Pin…).
-2. **Start lazygit here** → Enter (or **Space**).
-3. Do the same in each repo's space. Spaces without a pin fold the column, or show
-   an everywhere pin if you made one (a shell in `~` pinned to **All** is handy).
-
-lazygit runs as a kept terminal named `pin-lazygit-<folder>-<id>`. Unpinning leaves
-it running; end it with `hc kill <address>`.
-
-## How it works
-
-Herdr has no command to swap one terminal in a layout, so the mod edits your layout
-file: when the space changes it reads the file, replaces the one `"terminal": "…"`
-value inside the `pins-terminal` block and writes it back only if the address changed
-(the write is refused if the file changed in between; it reads again and retries once).
-Nothing else in the file changes. The window picks the edit up within a second.
-Folding resizes the terminal block to 1px, the header to 7px and the column to 8px, and
-sets the block's address to `""`; Herdr keeps the sizes as clicks, not in your file. Nothing is
-hidden and nothing is 0px: when Herdr saves a layout itself it drops hidden and 0px
-nodes (see RECIPE.md, Watch out).
-
-Moving the column is a structural edit: the mod rewrites the whole layout file as
-2-space JSON with the column (and its `main-column` or `main-row` wrapper) moved,
-so a hand-formatted layout loses its formatting. The fold and sizes follow the ids.
-
-Moving a pane into the column is Herdr's `terminal.park` (the pane goes, the
-terminal keeps running) then `hc keep` again, since park turns core keep off. Parking a
-space's last pane would close the space, so the mod first opens a shell tab there
-(`tab.new`, in the space's live folder) and parks only once it shows (within 2 s; else the
-pane stays and a toast says so).
-
-If Herdr's own layout save drops part of the column anyway, the mod puts it back the
-next time it reads the file (a toast says so), and `node setup.mjs` does the same.
-
-Pins live in Herdr's shared state under `pins.list`. The column opens at the size you
-last dragged it to (kept in Herdr's shared state under `pins.size`, per layout and for
-under/over the tabs or beside them), else at the `size.px` in your layout file. lazygit
-wants about 360 px. Switching between two spaces that both show a pin never resizes it.
-
-## Limits
-
-- The mod edits your layout file's one `terminal` value. Use a personal layout, and
-  expect that value to change in version control if you keep your layouts there.
-- A space pin belongs to that space's id. Two spaces in the same folder are two places,
-  each with its own pin; a space closed and made again is a new space.
-- After a core restart a kept program is a plain shell until you click Restart.
-- Terminals on another machine (`omarchy/t9`) can be pinned; the block draws them
-  like local ones.
-- Move… only places the column beside the tab area. Anywhere else: edit the file.
-- Herdr's own layout save also unwraps the right panel of a layout cloned from `main`
-  (then Files/Changes can't hide it); the mod puts that wrapper back too, with a toast.
-- Folded on the right or left with nothing pinned, the strip offers Pin… only; pin
-  something (or use `pins.move:<where>`) to reach Move….
-- Built on Herdr 0.1.11, macOS.
+- The mod rewrites one `terminal` value in your layout file when the space
+  changes, so use a personal layout.
+- After a core restart a kept program is a plain shell until you click
+  **Restart** in the header.
+- Don't bind `layout.toggle:pins`: Herdr's layout save drops hidden nodes.
+- Built on Herdr 0.1.11, macOS. Details, pixels and pitfalls: [RECIPE.md](RECIPE.md).
 
 ## Development
 
-```sh
-node --test tests/
-```
-
-Stdlib only. `tests/fixtures/layout.json` is a personal layout (a `main` clone)
-with the pins column added. Edit in the repo, then `node setup.mjs` updates the
-installed copy and Herdr reloads it. A symlink instead of the copy draws no icons
-and, in Herdr 0.1.11, does not reload on edits either (remove and recreate the link).
-
-## License
-
-MIT. Icons after [Lucide](https://lucide.dev) (ISC).
+`node --test tests/`, stdlib only. MIT; icons after [Lucide](https://lucide.dev).
