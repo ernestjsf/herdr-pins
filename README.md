@@ -53,7 +53,7 @@ wrap the `main` block in a column and add the pins column after it:
 ```json
 { "id": "main-column", "type": "column", "gap": 8, "children": [
   { "id": "main", "type": "block", "content": { "tab": "active", "...": "as before" } },
-  { "id": "pins", "type": "column", "size": { "px": 360 }, "min": 28, "max": 700,
+  { "id": "pins", "type": "column", "size": { "px": 360 }, "min": 8, "max": 700,
     "background": "background", "radius": 10, "border": { "width": 1, "color": "border" },
     "focus": { "border": { "width": 1, "color": "accent" } },
     "children": [
